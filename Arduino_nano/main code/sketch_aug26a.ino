@@ -14,50 +14,55 @@
 #define M2_d2 11
 #define M2_en 5
 // motion PID
-volatile int counter = 0; // stand by the number of pulses given
-volatile int state1 = LOW;
-volatile int state2 = LOW;
-int completeTurn = 1024;
+
 
 class Encoder{
   private:
     int counter = 0;
-    int turnsToCm = 0;
+    int countPerRevolution = 0;
+    int circumference = 0;
+    int countPerCm = 0;
+    float target = 0;
+    int E1 = 5; // encoder pin 1
+    int E2 = 6; // encoder pin 2
   public:
-    Encoder(int counts,int Cm ){
-      turnsToCm = Cm;
-      completeTurn = counts;
+    Encoder(int counts,int Cm, int e1,int e2 ){ // e1,e2 is the encoder pins 
+
+      circumference = Cm;
+      countPerRevolution = counts;
+      countPerCm = countPerRevolution / circumference;
+      E1 = e1;
+      E2 = e2;
     }
     float Get_Moved_distance_from_launch(){
-      return (float)counter / turnsToCm;
+      return (float)counter / countPerCm;
     }
     float Get_Moved_Distance_From_Point(float distance){
-      return (float)counter /  turnsToCm - distance  ;
+      return this - >Get_Moved_distance_from_launch() - distance  ;
     }
-    float Get_Distance_From_Point(float distance){
-      return distance - (float)counter /  turnsToCm ; 
+    // float Get_Distance_From_Point(float distance){
+    //   return distance - (float)counter /  turnsToCm ; 
+    // }
+    void set_target(float cm){
+      target = cm + this -> Get_Moved_distance_from_launch();
+    }
+    float distance_from_target(){
+        return target - this -> Get_Moved_distance_from_launch();
     }
     void Counter(){
-      if(digitalRead(E1_Pin1) == LOW && digitalRead(E1_Pin2) == HIGH)
+      if(digitalRead(E1) == LOW && digitalRead(E2) == HIGH)
       {
-        if(state1 == HIGH)
           counter++;
-        else 
-          counter--;
       }
-      else if(digitalRead(E1_Pin1) == HIGH && digitalRead(E1_Pin2) == LOW)
+      else if(digitalRead(E1) == HIGH && digitalRead(E2) == LOW)
       {
-        if(state1 == LOW)
           counter++;
-        else 
-          counter--;
       }
-      state1 = digitalRead(E1_Pin1);
-      state2 = digitalRead(E1_Pin2);
+      else{counter--;}
     } 
 };
-Encoder E1(900,900);
-Encoder E2(900,900);
+Encoder E1(1000,40.84,E1_Pin1,E1_Pin2);
+Encoder E2(1000,40.84,E2_Pin1,E2_Pin2);
 
 void PID_controller(float target1,int direction1,float target2,int direction2);
 void motor_motion(float speed, int direction);
@@ -91,20 +96,22 @@ void setup() {
 
 void loop() {
   // put your main code here, to run repeatedly:
-  
+  PID_controller(2,0,2,1);
+
 }
 
 // function definitions
 
 void PID_controller(float target1,int direction1,float target2,int direction2){  // directions is 0 : CCW , 1 : CW
   int init_time = millis();
+  E1.set_target(target1);
+  E2.set_target(target2);
   int clearance = 0.5; // 0.5 cm
   // can record that point we started to use PID which can be used later
-  int P1 = 0,I1 = 0,D1 = 0;
+  int P = 0,I = 0,D = 0;
   float diffrential1 = 0;
   float integral1 = 0;
 
-  int P2 = 0,I2 = 0,D2 = 0;
   float diffrential2 = 0;
   float integral2 = 0;
   
@@ -116,9 +123,14 @@ void PID_controller(float target1,int direction1,float target2,int direction2){ 
   float voltage1 = 0;
   float voltage2 = 0;
 
-  while(true){
-    float e1 = E1.Get_Distance_From_Point(target1);
-    float e2 = E2.Get_Distance_From_Point(target1);
+  Serial.print("Enter P ,I ,D values : ");
+  P = Serial.read();
+  I = Serial.read();
+  D = Serial.read();
+
+  while(true || Serial.read() == 's'){
+    float e1 = E1.distance_from_target();
+    float e2 = E2.distance_from_target();
   
     if(abs(e1) < clearance && abs(e2) > clearance){
 
@@ -127,15 +139,31 @@ void PID_controller(float target1,int direction1,float target2,int direction2){ 
 
       integral1 += (float)(e1 + last_error1) / 2 * dt;
       diffrential1 = ((float)(e1- last_error1)) / dt;
-      voltage1 = P1 * e1 + I1 * integral1 + D1 * diffrential1;
+      voltage1 = P * e1 + I * integral1 + D * diffrential1;
       
-      motor1_motion(voltage1 , direction1);
+      if(voltage1 < 0){
+          if(direction1 == 0)
+            motor1_motion(voltage1 * -1,1);
+          else
+            motor1_motion(voltage1 * -1,0);
+
+        }
+        else
+          motor1_motion(voltage1,direction2);
+
 
       integral2 += (float)(e2 + last_error2) / 2 * dt;
       diffrential2 = ((float)(e2- last_error2)) / dt;
-      voltage2 = P2 * e2 + I2 * integral2 + D2 * diffrential2;
+      voltage2 = P * e2 + I * integral2 + D * diffrential2;
+      if(voltage2 < 0){
+        if(direction2 == 0)
+          motor2_motion(voltage2 * -1,1);
+        else
+          motor2_motion(voltage2 * -1,0);
 
-      motor1_motion(voltage2,direction2);
+      }
+      else
+        motor2_motion(voltage2,direction2);
 
       last_error1 = e1;
       last_error2 = e2;

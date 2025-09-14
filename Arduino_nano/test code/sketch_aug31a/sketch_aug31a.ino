@@ -77,14 +77,7 @@ void setup() {
 
 void loop() {
   // put your main code here, to run repeatedly:
-  Serial.println("M2");
-  run_motor(M2_d1,M2_d2,M2_en);
-  delay(5000);
-  stop_motor(M2_d1,M2_d2,M2_en);
-
-  Serial.println(counter1);
-  Serial.println(counter1 / 5);
-  delay(1000);
-  counter1 = 0;
+  Serial.println(counter);
+  
 
 }

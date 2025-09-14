@@ -1,3 +1,4 @@
+
 #include <math.h>
 // -------------- Global Variables ----------------//
 
@@ -173,7 +174,6 @@ void PID_controller(float target1,int direction1,float target2,int direction2){ 
   }
 }
 void motor1_motion(float speed, int direction){
-  switch(direction){
     switch(direction){
       case 0: // CCW
         digitalWrite(M1_d1,HIGH);
@@ -188,7 +188,6 @@ void motor1_motion(float speed, int direction){
       default :
         return;
     }
-  }
 }
 void motor2_motion(float speed, int direction){
   switch(direction){

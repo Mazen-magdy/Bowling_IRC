@@ -16,6 +16,7 @@ ISR(TIMER1_COMPA_vect){
 ISR(TIMER1_COMPB_vect){
   // Motor 2 flag , feedback, dt
   M2_timer_tiked = true;
+  M2_encoder_read = E1.getDistance;
 }
 bool flag_A =false,flag_B = false;
 long async_two_motors = E1.getMovedDistance - E2.getMovedDistance;

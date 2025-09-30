@@ -6,7 +6,7 @@ def socket_server_setup():
     server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
     # bind the socket
-    server_socket.bind(('192.168.51.31', 5555))  # we might change the ip and the port
+    server_socket.bind(('192.168.175.116', 5555))  # we might change the ip and the port
                                     # the client does not need bind because it sends not recieving
 
     # start listening for the connection
@@ -41,3 +41,8 @@ def socket_server_setup():
 
 
 socket_server_setup()
+
+
+
+
+

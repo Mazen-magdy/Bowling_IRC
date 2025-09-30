@@ -1,6 +1,7 @@
 #include "Motor.h"
 #include "driver/gpio.h"
 #include "driver/ledc.h"
+#include <math.h>
 
 
 void motor_init(struct Motor* motor, int pin_PWM, int pin_IN1, int pin_IN2, float min_PWM, float max_PWM) {

@@ -2,9 +2,12 @@
 #include "driver/gpio.h"
 #include "esp_timer.h"
 #include "esp_rom_sys.h"
-#include "Project_components/PID.h"
-#include "Project_components/Motor.h"
-#include "Project_components/Encoder.h"
+#include "../Project_components/PID.h"
+#include "../Project_components/Motor.h"
+#include "../Project_components/Encoder.h"
+
+// Timer flag for periodic interrupt
+extern int timer_flag;
 
 #define LED_PIN 2
 #define E1_PIN_A 18

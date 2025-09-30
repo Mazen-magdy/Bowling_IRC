@@ -1,6 +1,6 @@
 #include "./Encoder.h"
 #include <driver/gpio.h>
-void encoder_init(struct Encoder* encoder, long pin_A, long pin_B, float CPR, float circumference) {
+void encoder_init(struct Encoder* encoder, int pin_A, int pin_B, float CPR, float circumference) {
     encoder->pin_A = pin_A;
     encoder->pin_B = pin_B;
     encoder->counts = 0;
@@ -14,17 +14,17 @@ void encoder_init(struct Encoder* encoder, long pin_A, long pin_B, float CPR, fl
     gpio_set_direction(pin_B, GPIO_MODE_INPUT);
 }
 void encoder_update(struct Encoder* encoder) { // will be ISR for pin A change
-    if(digitalRead(encoder->pin_A) == 0 &&  digitalRead(encoder->pin_B) == 1) {
+    if(gpio_get_level(encoder->pin_A) == 0 &&  gpio_get_level(encoder->pin_B) == 1) {
         encoder->counts++;
     } 
-    else if(digitalRead(encoder->pin_A) == 1 &&  digitalRead(encoder->pin_B) == 0) {
+    else if(gpio_get_level(encoder->pin_A) == 1 &&  gpio_get_level(encoder->pin_B) == 0) {
         encoder->counts--;
-    }
+    }   
 }
-long encoder_get_counts(struct Encoder* encoder) {
+int32_t encoder_get_counts(struct Encoder* encoder) {
     return encoder->counts;
 }
-void encoder_set_counts(struct Encoder* encoder, long counts) {
+void encoder_set_counts(struct Encoder* encoder, int32_t counts) {
     encoder->counts = counts;
 }
 void encoder_reset(struct Encoder* encoder) {

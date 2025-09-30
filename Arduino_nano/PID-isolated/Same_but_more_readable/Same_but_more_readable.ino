@@ -7,6 +7,7 @@
 #include <Adafruit_Sensor_Set.h>
 #include <Adafruit_Simple_AHRS.h>
 #include <Adafruit_MPU6050.h>
+#include <math.h>
 // ====================     DEFINES      ====================
 
 // Motor 1 Pins
@@ -14,7 +15,7 @@
 #define E1_Pin2 4 // don't have interrupt
 #define M1_d1 8
 #define M1_d2 12
-#define M1_en 9
+#define M1_en 6
 
 // Motor 2 Pins
 #define E2_Pin1 2 // has interrupt
@@ -90,40 +91,59 @@ Adafruit_Madgwick filter;  // or Adafruit_Mahony filter
 
 bool user_Data = false;
 
+// Add globals
+float E1_error, V1_out;
+int   Signal1;
+
+float E2_error, V2_out;
+int   Signal2;
+float distance;
+
+
 // Motor 1
 volatile bool     M1_timer_tiked   = false;
 volatile uint32_t M1_last_millis   = 0;
-volatile long     M1_encoder_read  = 0;
+volatile float     M1_encoder_read  = 0;
 
 // Motor 2
 volatile bool     M2_timer_tiked   = false;
 volatile uint32_t M2_last_millis   = 0;
-volatile long     M2_encoder_read  = 0;
+volatile float     M2_encoder_read  = 0;
 
 // Sync + Control flags
+float async_two_motors; //not used just to avoid old code errors
 bool  flag_A = false, flag_B = false;
-long  async_two_motors = 0;
-float Ksync = 0.2;
-
+float startTime;
+float  sync = 0;
+float  Last_sync = 0;
+float  Int_sync = 0;
+float P_sync = 0;
+float I_sync = 0;
+float D_sync = 0;
+float D_sync_last = 0;
+float correction;
+float K_correction;
 
 // ==================== PID STATE VARIABLES ====================
 
 // --- Motor 1 PID ---
 float M1_integral       = 0;
+float M1_e;
 float M1_last_D_filtered= 0;
-float M1_alpha          = 0.5;
+float M1_alpha          = 0.8;
 int   M1_last_Error     = 0;
-float M1_P, M1_I, M1_D;
+float M1_P= 0, M1_I = 0 , M1_D = 0;
 float M1_startPoint;            // in cm
 float M1_last_measure   = 0;
 float M1_clearance      = 0.5;
 bool  M1_target_set     = false;
 // --- Motor 2 PID ---
 float M2_integral       = 0;
+float M2_e;
 float M2_last_D_filtered= 0;
-float M2_alpha          = 0.5;
+float M2_alpha          = 0.8;
 int   M2_last_Error     = 0;
-float M2_P, M2_I, M2_D;
+float M2_P = 0, M2_I = 0, M2_D = 0;
 float M2_startPoint;            // in cm
 float M2_last_measure   = 0;
 float M2_clearance      = 0.5;
@@ -193,7 +213,7 @@ void get_Yaw_angle_10ms(){
     // normalize angle to -180..180
     if (yaw > 180) yaw -= 360;
     if (yaw < -180) yaw += 360;
-    Serial.print("Yaw: "); Serial.println(filter.getYaw());
+    // Serial.print("Yaw:"); Serial.print(filter.getYaw()); Serial.print(",");
   }
 }
 // --- feedback function ---
@@ -212,7 +232,6 @@ float get_Yaw_angle(){
   // normalize angle to -180..180
   if (yaw > 180) yaw -= 360;
   if (yaw < -180) yaw += 360;
-  Serial.print("Yaw: "); Serial.println(filter.getYaw());
   return yaw;
 } // needs Delay for 10ms
 
@@ -221,11 +240,11 @@ float get_Yaw_angle(){
 void yaw_PID_Controller(){
   if(yaw_Reached) return;
 
-  if(millis() - last_Time == 10){
-
-      yaw = get_Yaw_angle();
+  if(millis() - last_Time >= 10){
+      // Serial.println("calcuate yaw :");
+      yaw = get_Yaw_angle(); 
       float error = yaw_Target - yaw;
-
+      // Serial.print("errorAngle:"); Serial.print(error); Serial.print(',');
       if(error < yaw_Clearence){
         //stop
         yaw_Reached = true;
@@ -242,103 +261,195 @@ void yaw_PID_Controller(){
                        (1 - yaw_Alpha) * yaw_last_D_filtered;
 
       float V = yaw_P * error + yaw_I * yaw_Integral - yaw_D * D_filtered;
-
+      // Serial.print("Voltage_Angle:"); Serial.print(V/2); Serial.print(",");
        Motor1_Motion(V/2);
        Motor2_Motion(-1 * V/2);
 
        yaw_last_error = error;
        yaw_last_D_filtered = D_filtered;
        last_Yaw = yaw;
+       last_Time = millis();
   }
 }
 
 // ==================== MOTION PID FUNCTIONS ====================
 
+// void PID_motion_M1() {
+//   if (M1_timer_tiked) {
+//     cli();
+//     float dt         = (millis() - M1_last_millis) / 1000.0;
+//     float encoder_read = M1_encoder_read;
+//     M1_timer_tiked   = false;
+//     sei();
+//     if(dt == 0) dt = 0.001;
+//     float e            = encoder_read;
+//     M1_e = e;
+//     if (abs(e) <= M1_clearance) {
+//       Motor1_Motion(0); // stop motor
+//       flag_A = true;
+//       if (flag_B) stop_motors_PID_controller();
+//       return;
+//     }
+//     // Serial.println("M1 Move ! ");
+//     //  Serial.print("Error1:");
+//     Serial.print(e); Serial.print(","); 
+
+//     float measure = E1.Get_Moved_Distance_From_Point(M1_startPoint);
+
+//     // Integral
+//     M1_integral += (e + M1_last_Error) / 2 * dt;
+//     M1_integral  = constrain(M1_integral, -1000, 1000);
+
+//     // Derivative (filtered)
+//     float D_filtered = M1_alpha * (e - M1_last_Error) / dt +
+//                        (1 - M1_alpha) * M1_last_D_filtered;
+
+//     // Sync term
+//     // async_two_motors = E1.Get_Moved_Distance_From_Point(M1_startPoint) / (millis()-startTime) - E1.Get_Moved_Distance_From_Point(M2_startPoint) / (millis()-startTime);
+//     async_two_motors = M1_e - M2_e;
+//     (M2_startPoint);
+
+//     // PID output
+//     float V = M1_P * e + M1_I * M1_integral - M1_D * D_filtered
+//               + Ksync * async_two_motors;
+//     // Serial.print("voltage1 :");
+//     Serial.print(V); Serial.print(",");
+//     Motor1_Motion(V);
+
+//     // Store last values
+//     M1_last_millis     = millis();
+//     M1_last_Error      = e;
+//     M1_last_D_filtered = D_filtered;
+//     M1_last_measure    = measure;
+//   }
+// }
+
+// void PID_motion_M2() {
+//   if (M2_timer_tiked) {
+//     cli();
+//     float dt         = (millis() - M2_last_millis) / 1000.0;
+//     float encoder_read = M2_encoder_read;
+//     M2_timer_tiked   = false;
+//     sei();
+//     if(dt == 0) dt = 0.001;
+//     float e = encoder_read;
+//     M2_e = e;
+//     if (abs(e) <= M2_clearance ) {
+//       Motor2_Motion(0); // stop motor
+//       flag_B = true;
+//       if (flag_A) stop_motors_PID_controller();
+//       return;
+//     }
+//     // Serial.println("M2 Move ! ");
+//     // Serial.print("Error2:"); 
+//     Serial.print(e);  Serial.print(",");
+//     float measure = E2.Get_Moved_Distance_From_Point(M2_startPoint);
+
+//     // Integral
+//     M2_integral += (e + M2_last_Error) / 2 * dt;
+//     M2_integral  = constrain(M2_integral, -1000, 1000);
+
+//     // Derivative (filtered)
+//     float D_filtered = M2_alpha * (e - M1_last_Error) / dt +
+//                        (1 - M2_alpha) * M2_last_D_filtered;
+
+//     // Sync term
+//     // async_two_motors = E1.Get_Moved_Distance_From_Point(M1_startPoint) / (millis()-startTime) - E1.Get_Moved_Distance_From_Point(M2_startPoint) / (millis()-startTime);
+    
+//     // PID output
+//     float V = M2_P * e + M2_I * M2_integral - M2_D * D_filtered
+//               - Ksync * async_two_motors;
+//     // Serial.print("voltage2 :"); 
+//     Serial.print(V);Serial.print(",");
+//     Motor2_Motion(V);
+
+//     // Store last values
+//     M2_last_millis     = millis();
+//     M2_last_Error      = e;
+//     M2_last_D_filtered = D_filtered;
+//     M2_last_measure    = measure;
+//   }
+// }
 void PID_motion_M1() {
   if (M1_timer_tiked) {
     cli();
-    float dt         = (millis() - M1_last_millis) / 1000.0;
-    int encoder_read = M1_encoder_read;
-    M1_timer_tiked   = false;
+    float dt = (millis() - M1_last_millis) / 1000.0;
+    float encoder_read = M1_encoder_read;
+    M1_timer_tiked = false;
     sei();
+    if (dt == 0) dt = 0.001;
 
-    int e            = encoder_read;
-
-    if (e <= M1_clearance) {
-      Motor1_Motion(0); // stop motor
+    float e = encoder_read;
+    M1_e = e;
+    E1_error = e;   // save for plotting
+    if (abs(e) <= M1_clearance) {
+      Motor1_Motion(0);
       flag_A = true;
       if (flag_B) stop_motors_PID_controller();
       return;
     }
-
-    float measure = E1.Get_Moved_Distance_From_Point(M1_startPoint);
-
-    // Integral
+    // sync 
+    sync = E2_error - E1_error;
+    Int_sync += (sync + Last_sync) / 2 * dt;
+    Int_sync = constrain(Int_sync, -1000, 1000);
+    float Div_sync = M1_alpha * (sync - Last_sync) / dt +
+                       (1 - M1_alpha) * D_sync_last;
+    correction = P_sync * sync + I_sync * Int_sync + D_sync * Div_sync;
+    D_sync_last = Div_sync;
+    //int
     M1_integral += (e + M1_last_Error) / 2 * dt;
-    M1_integral  = constrain(M1_integral, -1000, 1000);
-
-    // Derivative (filtered)
-    float D_filtered = M1_alpha * (measure - M1_last_measure) / dt +
+    M1_integral = constrain(M1_integral, -1000, 1000);
+    //div
+    float D_filtered = M1_alpha * (e - M1_last_Error) / dt +
                        (1 - M1_alpha) * M1_last_D_filtered;
 
-    // Sync term
-    async_two_motors = E1.Get_Moved_Distance_From_Point(M1_startPoint) - E2.Get_Moved_Distance_From_Point(M2_startPoint);
-
-    // PID output
-    float V = M1_P * e + M1_I * M1_integral - M1_D * D_filtered
-              - Ksync * async_two_motors;
+    // async_two_motors = M1_e - M2_e;
+    //signal
+    float V = M1_P * e + M1_I * M1_integral - M1_D * D_filtered -  K_correction * correction ;
+    V1_out = V;   // save for plotting
 
     Motor1_Motion(V);
 
-    // Store last values
-    M1_last_millis     = millis();
-    M1_last_Error      = e;
+    M1_last_millis = millis();
+    M1_last_Error = e;
     M1_last_D_filtered = D_filtered;
-    M1_last_measure    = measure;
+    Last_sync = sync;
   }
 }
-
 void PID_motion_M2() {
   if (M2_timer_tiked) {
     cli();
-    float dt         = (millis() - M2_last_millis) / 1000.0;
-    int encoder_read = M2_encoder_read;
-    M2_timer_tiked   = false;
+    float dt = (millis() - M2_last_millis) / 1000.0;
+    float encoder_read = M2_encoder_read;
+    M2_timer_tiked = false;
     sei();
+    if (dt == 0) dt = 0.001;
 
-    int e = encoder_read;
+    float e = encoder_read;
+    M2_e = e;
+    E2_error = e;   // save for plotting
 
-    if (e <= M2_clearance) {
-      Motor1_Motion(0); // stop motor
+    if (abs(e) <= M2_clearance) {
+      Motor2_Motion(0);
       flag_B = true;
       if (flag_A) stop_motors_PID_controller();
       return;
     }
 
-    float measure = E2.Get_Moved_Distance_From_Point(M2_startPoint);
-
-    // Integral
     M2_integral += (e + M2_last_Error) / 2 * dt;
-    M2_integral  = constrain(M2_integral, -1000, 1000);
+    M2_integral = constrain(M2_integral, -1000, 1000);
 
-    // Derivative (filtered)
-    float D_filtered = M2_alpha * (measure - M2_last_measure) / dt +
+    float D_filtered = M2_alpha * (e - M2_last_Error) / dt +
                        (1 - M2_alpha) * M2_last_D_filtered;
 
-    // Sync term
-    async_two_motors = E1.Get_Moved_Distance_From_Point(M1_startPoint) - E2.Get_Moved_Distance_From_Point(M2_startPoint);
+    float V = M2_P * e + M2_I * M2_integral - M2_D * D_filtered + K_correction * correction;
+    V2_out = V;   // save for plotting
 
-    // PID output
-    float V = M2_P * e + M2_I * M2_integral - M2_D * D_filtered
-              + Ksync * async_two_motors;
+    Motor2_Motion(V);
 
-    Motor1_Motion(V);
-
-    // Store last values
-    M2_last_millis     = millis();
-    M2_last_Error      = e;
+    M2_last_millis = millis();
+    M2_last_Error = e;
     M2_last_D_filtered = D_filtered;
-    M2_last_measure    = measure;
   }
 }
 
@@ -364,17 +475,21 @@ void stop_motors_PID_controller() {
 // ==================== MOTOR CONTROL ====================
 void Motor1_Motion(float speed){
   bool dir = (speed >= 0) ? 1 : 0;
-  speed = map(speed,0,12,0,255);
+  // if(speed < 0) speed *= -1;
+  int signal = (abs(speed) / 12.0) * 255.0;
+  signal = constrain(signal , 10 , 255);
+  // Serial.print("signal 1 :");
+  Signal1 = signal;   // save for plotting
   switch(dir){
       case 0: // CCW
         digitalWrite(M1_d1,HIGH);
         digitalWrite(M1_d2,LOW);
-        analogWrite (M1_en,speed);
+        analogWrite (M1_en,signal);
         break;
       case 1: // CW 
         digitalWrite(M1_d1, LOW);
         digitalWrite(M1_d2,HIGH);
-        analogWrite (M1_en,speed);
+        analogWrite (M1_en,signal);
         break;
       default :
         return;
@@ -383,17 +498,21 @@ void Motor1_Motion(float speed){
 
 void Motor2_Motion(float speed){
   bool dir = (speed >= 0) ? 1 : 0;
-  speed = map(speed,0,12,0,255);
+  // if(speed < 0) speed *= -1;
+  int signal = (abs(speed) / 12.0) * 255.0;
+  signal = constrain(signal , 10 , 255);
+  // Serial.print("signal 2 :");
+  Signal2 = signal;   // save for plotting
   switch(dir){
       case 0: // CCW
-        digitalWrite(M1_d1,HIGH);
-        digitalWrite(M1_d2,LOW);
-        analogWrite (M1_en,speed);
+        digitalWrite(M2_d1,HIGH);
+        digitalWrite(M2_d2,LOW);
+        analogWrite (M2_en,signal);
         break;
       case 1: // CW 
-        digitalWrite(M1_d1, LOW);
-        digitalWrite(M1_d2,HIGH);
-        analogWrite (M1_en,speed);
+        digitalWrite(M2_d1, LOW);
+        digitalWrite(M2_d2,HIGH);
+        analogWrite (M2_en,signal);
         break;
       default :
         return;
@@ -405,7 +524,7 @@ void Motor2_Motion(float speed){
 void setup() {
   // setup interrupt on Timer1 with OCR1A , OCR1B
   Serial.begin(9600);
-  Serial.println("started");
+  // Serial.println("started");
 
   pinMode(E1_Pin1, INPUT);
   pinMode(E1_Pin2, INPUT);
@@ -421,44 +540,73 @@ void setup() {
   
   attachInterrupt(digitalPinToInterrupt(E1_Pin1), E1_ISR, CHANGE);
   attachInterrupt(digitalPinToInterrupt(E2_Pin1), E2_ISR, CHANGE);
+
+  // E1.set_target(10);
+  // E2.set_target(-10);
+
+  // // // get data from user
+    //  Serial.println("Enter P I D for M1");
+    //  Serial.print("initials is " ); Serial.print(M1_P); Serial.print(" "); Serial.print(M1_I); Serial.print(" "); Serial.print(M1_D); 
+      while(!Serial.available());
+      M1_P = Serial.parseFloat();
+      // Serial.print("M1_P "); Serial.println(M1_P);
+      while(!Serial.available());
+      M1_I = Serial.parseFloat();
+      // Serial.print("M1_I "); Serial.println(M1_I);
+      while(!Serial.available());
+      M1_D = Serial.parseFloat();
+      // Serial.print("M1_D "); Serial.println(M1_D);
+
+      // Serial.println("Enter P I D for M2");
+      // Serial.print("initials is " ); Serial.print(M2_P); Serial.print(" "); Serial.print(M2_I); Serial.print(" "); Serial.print(M2_D);
+      while(!Serial.available());
+      M2_P = Serial.parseFloat();
+      // Serial.print("M2_P "); Serial.println(M2_P);
+      while(!Serial.available());
+      M2_I = Serial.parseFloat();
+      // Serial.print("M2_I "); Serial.println(M2_I);
+      while(!Serial.available());
+      M2_D = Serial.parseFloat();
+      // Serial.print("M2_D "); Serial.println(M2_D);
+      while(!Serial.available());
+      P_sync = Serial.parseFloat();
+      // Serial.print("P_sync "); Serial.println(P_sync);
+      while(!Serial.available());
+      I_sync = Serial.parseFloat();
+      // Serial.print("I_sync "); Serial.println(I_sync);
+      while(!Serial.available());
+      D_sync = Serial.parseFloat();
+      // Serial.print("D_sync "); Serial.println(D_sync);
+      while(!Serial.available());
+      K_correction = Serial.parseFloat();
+      // Serial.print("K_correction "); Serial.println(K_correction);
+      while(!Serial.available());
+      distance = Serial.parseFloat();
+      // Serial.print("distance "); Serial.println(distance);
+
+      // Serial.println("started");
+  // Serial.println("Please enter target angle : ");
+  // while(!Serial.available());
+  // yaw_Target = Serial.parseFloat();
+  // Serial.print("target angle : "); Serial.println(yaw_Target);
+  // delay(200);  
+
 }
 
 void loop() {
   // ================= MOTION PID CONTROL TESTING =================
-    // get data from user
-    if(!user_Data){
-      Serial.println("Enter P I D for M1");
-      while(!Serial.available());
-      M1_P = Serial.read();
-      Serial.print("M1_P "); Serial.println(M1_P);
-      while(!Serial.available());
-      M1_I = Serial.read();
-      Serial.print("M1_I "); Serial.println(M1_I);
-      while(!Serial.available());
-      M1_D = Serial.read();
-      Serial.print("M1_D "); Serial.println(M1_D);
 
-      Serial.println("Enter P I D for M2");
-      while(!Serial.available());
-      M2_P = Serial.read();
-      Serial.print("M2_P "); Serial.println(M2_P);
-      while(!Serial.available());
-      M2_I = Serial.read();
-      Serial.print("M2_I "); Serial.println(M2_I);
-      while(!Serial.available());
-      M2_D = Serial.read();
-      Serial.print("M2_D "); Serial.println(M2_D);
-    }
 
-    // ---- PID_Intialization ----
+    //---- PID_Intialization ----
       if(!M1_target_set){
         M1_startPoint = E1.Get_Moved_distance_from_launch();
-        E1.set_target(122.52);
+        E1.set_target(distance);
+        startTime = millis();
         M1_target_set = true;
       }
       if(!M2_target_set){
         M2_startPoint = E2.Get_Moved_distance_from_launch();
-        E2.set_target(122.52);
+        E2.set_target(distance);
         M2_target_set = true;
       }
     //
@@ -466,18 +614,24 @@ void loop() {
 
     PID_motion_M1();
     PID_motion_M2();
+
+      // Print all values in one row for Serial Plotter
+    Serial.print(millis() / 1000);  Serial.print(",");
+    Serial.print(E1_error);         Serial.print(",");
+    Serial.print(V1_out);           Serial.print(",");
+    Serial.print(Signal1);          Serial.print(",");
+    Serial.print(E2_error);         Serial.print(",");
+    Serial.print(V2_out);           Serial.print(",");
+    Serial.println(Signal2); // newline ends this row
   //
   // // ================= ROTATION PID CONTROL TESTING =================
   //   // get data from user
-  //   if(!user_Data){
-  //     Serial.println("Please enter target angle : ");
-  //     while(!Serial.available());
-  //     yaw_Target = Serial.read();
-  //     Serial.print("traget angle : "); Serial.println(yaw_Target);
-  //   }
-  //   yaw_PID_Controller();
-  // //
+    // if(!user_Data){
+    
+    // }
+  //  yaw_PID_Controller();
+  //
 
 
-  user_Data = true; // prevent input in the next all loop just first time it asks
+  // user_Data = true; // prevent input in the next all loop just first time it asks
 }

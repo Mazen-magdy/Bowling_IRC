@@ -16,5 +16,10 @@
     "--query-driver=D:\\Education\\softwares\\Espressif\\tools\\xtensa-esp-elf\\esp-14.2.0_20241119\\xtensa-esp-elf\\bin\\xtensa-esp32-elf-gcc.exe",
     "--compile-commands-dir=${workspaceFolder}\\build"
   ],
-  "idf.flashType": "UART"
+  "idf.flashType": "UART",
+  "files.associations": {
+    "encoder.h": "c",
+    "gpio.h": "c",
+    "pid.h": "c"
+  }
 }

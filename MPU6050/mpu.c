@@ -1,19 +1,4 @@
-#include <stdio.h>
-#include <math.h>
-#include "freertos/FreeRTOS.h"
-#include "freertos/task.h"
-#include "driver/i2c.h"
-
-#define I2C_MASTER_NUM              I2C_NUM_0
-#define I2C_MASTER_SCL_IO           22
-#define I2C_MASTER_SDA_IO           21
-#define I2C_MASTER_FREQ_HZ          100000
-#define I2C_MASTER_TIMEOUT_MS       1000
-
-#define MPU6050_ADDR                0x68
-#define MPU6050_PWR_MGMT_1         0x6B
-#define MPU6050_ACCEL_XOUT_H       0x3B
-#define RAD_TO_DEG                  57.2957795131
+#include "main.h"
 
 // I2C write (custom function, renamed to avoid conflict)
 esp_err_t mpu6050_write_byte(uint8_t reg_addr, uint8_t data) {
@@ -103,15 +88,13 @@ void i2c_scan() {
     }
 }
 
-
-
-
-void app_main(void) {
+void MPU6050()
+{
     i2c_scan();
     i2c_master_init();
     mpu6050_init();
 
-    while (1) {
+    
         int16_t ax, ay, az;
         float pitch_before, roll_before, pitch_after, roll_after;
 
@@ -131,5 +114,12 @@ void app_main(void) {
 
         printf("Pitch: %.2f°, Roll: %.2f°\n", pitch_before, roll_before);
         vTaskDelay(pdMS_TO_TICKS(500));
-    }
+    
+
+}
+
+
+void app_main(void) {
+
+    MPU6050();
 }

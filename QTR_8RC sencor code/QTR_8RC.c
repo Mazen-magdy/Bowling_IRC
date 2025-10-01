@@ -8,9 +8,6 @@ int sensor_pins[NUM_SENSORS] = {23, 22, 21, 19, 18, 17, 16, 15};
 
 // Reads one sensor (returns discharge time)
 
-// #include "freertos/FreeRTOS.h"
-// #include "freertos/task.h"
-// #include "esp_timer.h"
 
 // Timer callback to run QTR_8RC every 10 ms
 void qtr_timer_callback(void* arg) {
@@ -51,16 +48,16 @@ uint32_t read_qtr_sensor(int gpio_num) {
 }
 
 
-
+bool line_detected = false;
 void QTR_8RC()
 {
     //ESP_LOGI(TAG, "QTR-8RC Test Start");
-
+    
     bool on_white = true;
     bool was_white = true;
     int white_counter = 0;
 
-    // while (1) {
+    
         uint32_t values[NUM_SENSORS];
         int black_sensor_count = 0;
 
@@ -86,26 +83,14 @@ void QTR_8RC()
 
         // Detect transitions and log
         if (!on_white && was_white) {
-            ESP_LOGI(TAG, "Black line detected!");
+            line_detected = true;
         } else if (on_white && !was_white) {
-            ESP_LOGI(TAG, "Line lost! Back on white.");
+            line_detected = false;
         } else {
-            ESP_LOGI(TAG, "Tracking... %s", on_white ? "White" : "Black");
+            line_detected = false;
         }
 
         was_white = on_white;
-
-        // Optional: print raw sensor values for tuning
-        
-        // printf("Sensor values: ");
-        // for (int i = 0; i < NUM_SENSORS; i++) {
-        //     printf("%lu ", values[i]);
-        // }
-        // printf("\n");
-        
-
-        // vTaskDelay(pdMS_TO_TICKS(333));  // Delay between readings
-    // }
 }
 
 

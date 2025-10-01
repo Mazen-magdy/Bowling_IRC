@@ -1,0 +1,4 @@
+#ifndef MOTOR_PID_ENCODED_H
+#define MOTOR_PID_ENCODED_H
+
+#endif // MOTOR_PID_ENCODED_H

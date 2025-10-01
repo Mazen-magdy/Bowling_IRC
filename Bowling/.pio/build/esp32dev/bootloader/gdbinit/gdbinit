@@ -1,0 +1,2 @@
+source D:/Education/Github/Bowling_IRC/Bowling/.pio/build/esp32dev/bootloader/gdbinit/symbols
+source D:/Education/Github/Bowling_IRC/Bowling/.pio/build/esp32dev/bootloader/gdbinit/connect

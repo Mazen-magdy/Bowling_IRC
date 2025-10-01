@@ -7,6 +7,33 @@ static const char *TAG = "QTR_8RC";
 int sensor_pins[NUM_SENSORS] = {23, 22, 21, 19, 18, 17, 16, 15};
 
 // Reads one sensor (returns discharge time)
+
+// #include "freertos/FreeRTOS.h"
+// #include "freertos/task.h"
+// #include "esp_timer.h"
+
+// Timer callback to run QTR_8RC every 10 ms
+void qtr_timer_callback(void* arg) {
+    QTR_8RC();
+}
+
+
+esp_timer_handle_t timer_handle;
+void start_qtr_timer() {
+    const esp_timer_create_args_t timer_args = {
+        .callback = &qtr_timer_callback,
+        .arg = NULL,
+        .name = "qtr_timer"
+    };
+    
+    esp_timer_create(&timer_args, &timer_handle);
+    esp_timer_start_periodic(timer_handle, 10000); // 10 ms = 10000 us
+}
+
+void stop_qtr_timer() {
+    esp_timer_stop(timer_handle);
+}
+
 uint32_t read_qtr_sensor(int gpio_num) {
     gpio_set_direction(gpio_num, GPIO_MODE_OUTPUT);
     gpio_set_level(gpio_num, 1);
@@ -23,14 +50,17 @@ uint32_t read_qtr_sensor(int gpio_num) {
     return (uint32_t)(esp_timer_get_time() - start);
 }
 
-void app_main(void) {
-    ESP_LOGI(TAG, "QTR-8RC Test Start");
+
+
+void QTR_8RC()
+{
+    //ESP_LOGI(TAG, "QTR-8RC Test Start");
 
     bool on_white = true;
     bool was_white = true;
     int white_counter = 0;
 
-    while (1) {
+    // while (1) {
         uint32_t values[NUM_SENSORS];
         int black_sensor_count = 0;
 
@@ -67,15 +97,20 @@ void app_main(void) {
 
         // Optional: print raw sensor values for tuning
         
-        printf("Sensor values: ");
-        for (int i = 0; i < NUM_SENSORS; i++) {
-            printf("%lu ", values[i]);
-        }
-        printf("\n");
+        // printf("Sensor values: ");
+        // for (int i = 0; i < NUM_SENSORS; i++) {
+        //     printf("%lu ", values[i]);
+        // }
+        // printf("\n");
         
 
-        vTaskDelay(pdMS_TO_TICKS(333));  // Delay between readings
-    }
+        // vTaskDelay(pdMS_TO_TICKS(333));  // Delay between readings
+    // }
+}
+
+
+void app_main(void) {
+    QTR_8RC();
 }
 
 

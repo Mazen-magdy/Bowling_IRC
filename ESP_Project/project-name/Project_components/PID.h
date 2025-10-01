@@ -1,7 +1,7 @@
 #ifndef PID_H
 #define PID_H
+#include <math.h>
 
-int timer_flag = 0;
 struct PID{
     float Kp;
     float Ki;

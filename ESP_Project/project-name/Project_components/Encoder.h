@@ -1,6 +1,6 @@
 #ifndef ENCODER_H
 #define ENCODER_H
-
+#include <driver/gpio.h>
 #include <stdint.h>
 
 struct Encoder {
@@ -19,4 +19,5 @@ void encoder_set_counts(struct Encoder* encoder, int32_t counts);
 void encoder_reset(struct Encoder* encoder);
 float encoder_get_distance(struct Encoder* encoder);
 float encoder_get_error_distance(struct Encoder* encoder);
+void encoder_attach_isr(struct Encoder* encoder, void (*isr_handler)(void));
 #endif // ENCODER_H

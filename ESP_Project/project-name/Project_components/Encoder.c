@@ -1,5 +1,4 @@
 #include "./Encoder.h"
-#include <driver/gpio.h>
 void encoder_init(struct Encoder* encoder, int pin_A, int pin_B, float CPR, float circumference) {
     encoder->pin_A = pin_A;
     encoder->pin_B = pin_B;

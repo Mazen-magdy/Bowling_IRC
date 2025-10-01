@@ -1,5 +1,4 @@
 #include "./PID.h"
-#include <math.h>
 void pid_init(struct PID* pid, float Kp, float Ki, float Kd,float clearance, float output_min, float output_max) {
     pid->Kp = Kp;
     pid->Ki = Ki;

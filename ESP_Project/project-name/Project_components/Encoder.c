@@ -38,7 +38,16 @@ float encoder_get_error_distance(struct Encoder* encoder) {
 }
 
 void encoder_attach_isr(struct Encoder* encoder, void (*isr_handler)(void)) {
-    gpio_set_intr_type(encoder->pin_A, GPIO_INTR_ANYEDGE);
-    gpio_install_isr_service(0);
+    // Configure GPIO
+    gpio_config_t io_conf = {
+        .intr_type = GPIO_INTR_ANYEDGE,  // interrupt on rising and falling edge
+        .mode = GPIO_MODE_INPUT,
+        .pin_bit_mask = (1ULL << encoder->pin_A),
+        .pull_down_en = 0,
+        .pull_up_en = 1  // or 0, depending on your circuit
+    };
+    gpio_config(&io_conf);
+
+    // Attach ISR
     gpio_isr_handler_add(encoder->pin_A, (gpio_isr_t)isr_handler, (void*) encoder);
 }

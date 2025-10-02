@@ -42,10 +42,12 @@ float k_sync = 0.0f;
 
 void  encoder_isr_1() {
     encoder_update(&encoder1);
+    printf("ISR1 triggered! Count: %d\n", (int)encoder1.counts);  // Debug output
 }
 
 void  encoder_isr_2() {
     encoder_update(&encoder2);
+    printf("ISR2 triggered! Count: %d\n", (int)encoder2.counts);  // Debug output
 }
 
 void periodic_timer_callback(void* arg) {
@@ -131,6 +133,11 @@ void app_main(void)
     pid_init(&pid_outer_loop, 1.0f, 0.0f, 0.0f, 0.5f, -12.0f, 12.0f);
     encoder_attach_isr(&encoder1, encoder_isr_1);
     // encoder_attach_isr(&encoder2, encoder_isr_2);
+    
+    printf("ISR attached for encoder1 on pin %d\n", E1_PIN_A);
+    printf("Initial pin A level: %d\n", gpio_get_level(E1_PIN_A));
+    printf("Initial pin B level: %d\n", gpio_get_level(E1_PIN_B));
+    
     // Set target distances from serial input
     encoder1.target_distance = 100; // Target distance in cm
     encoder2.target_distance = 100; // Target distance in cm

@@ -1,38 +1,13 @@
-#include <stdio.h>
-#include "freertos/FreeRTOS.h"
-#include "freertos/task.h"
-#include "freertos/event_groups.h"
-#include "esp_wifi.h"
-#include "esp_event.h"
-#include "esp_log.h"
-#include "nvs_flash.h" // Non-Volatile Storage (NVS) is required to store Wi-Fi config
-#include "esp_err.h"
-#include "esp_system.h"
-#include "lwip/err.h"
-#include "lwip/sockets.h"
-#include "lwip/netdb.h"
+#include "main.h"
 
-
-
-static esp_ip4_addr_t esp_ip;
-
-
-
-#define port 5555
-// #define ip_address ""
-
-// Your network credentials
-#define WIFI_SSID      "bowling"
-#define WIFI_PASS      "12345678"
 
 // FreeRTOS event group to handle Wi-Fi events
 static EventGroupHandle_t s_wifi_event_group;
-// Event bits
-#define WIFI_CONNECTED_BIT BIT0
-#define WIFI_FAIL_BIT      BIT1
+
 
 // TAG for ESP_LOG messages
 static const char *TAG = "wifi_station";
+static const char *SOCKET_TAG = "Socket_client";
 
 // Wi-Fi event handler function
 static void event_handler(void* arg, esp_event_base_t event_base,
@@ -44,8 +19,12 @@ static void event_handler(void* arg, esp_event_base_t event_base,
     } else if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_DISCONNECTED) {
         // The connection was lost or failed
         esp_wifi_connect(); // Try to reconnect
-        xEventGroupClearBits(s_wifi_event_group, WIFI_CONNECTED_BIT);
-        xEventGroupSetBits(s_wifi_event_group, WIFI_FAIL_BIT);
+
+        /*-------we will delete them for now and we will see-------------*/
+
+        // xEventGroupClearBits(s_wifi_event_group, WIFI_CONNECTED_BIT);
+        // xEventGroupSetBits(s_wifi_event_group, WIFI_FAIL_BIT);
+
         ESP_LOGI(TAG, "Failed to connect to AP. Retrying...");
     } else if (event_base == IP_EVENT && event_id == IP_EVENT_STA_GOT_IP) {
         // Success! We got an IP address from the router
@@ -104,9 +83,9 @@ void wifi_init_sta(void)
     ESP_LOGI(TAG, "wifi_init_sta finished. Attempting to connect...");
 }
 
-void app_main(void)
+void wifi_start()
 {
-    // Initialize NVS (Non-Volatile Storage) - essential for Wi-Fi to store settings
+        // Initialize NVS (Non-Volatile Storage) - essential for Wi-Fi to store settings
     esp_err_t ret = nvs_flash_init();
     if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND) {
         ESP_ERROR_CHECK(nvs_flash_erase());
@@ -133,17 +112,109 @@ void app_main(void)
         // YOUR APPLICATION CODE STARTS HERE!
         // e.g., Start a web server, connect to MQTT, etc.
 
-        
+        // socket_client_setup_1();
+
         while(1) {
             printf("Wi-Fi is connected! Doing my job...\n");
-            vTaskDelay(5000 / portTICK_PERIOD_MS);
-        
+            vTaskDelay(2000 / portTICK_PERIOD_MS);
         }
-
 
     } else if (bits & WIFI_FAIL_BIT) {
         ESP_LOGI(TAG, "Failed to connect to AP.");
     } else {
         ESP_LOGE(TAG, "UNEXPECTED EVENT");
     }
+}
+
+void app_main(void)
+{
+    wifi_start();
+}
+
+void socket_client_setup_1()
+{
+    char *message = "Hello from esp!";
+    char rx_buffer[128];
+    struct sockaddr_in dest_addr;
+
+
+    //configure client ?? address
+    dest_addr.sin_family = AF_INET;
+    dest_addr.sin_port = htons(port);
+    dest_addr.sin_addr.s_addr = inet_addr(ip_address);   
+    
+    // creating socket
+    int sock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+    if (sock < 0)
+    {
+        ESP_LOGE(TAG, "Failed to create socket !");
+        vTaskDelete(NULL);
+        return;
+    }
+    ESP_LOGI(SOCKET_TAG, "Socket created successfuly, connecting to %s:%d...", ip_address, port);
+
+    // connecting the socket
+    /*connect the socket with the address given and the size of memory needed*/
+
+    int feedback_fron_connect;
+    feedback_fron_connect = connect(sock, (struct sockaddr *)&dest_addr, sizeof(dest_addr));
+    if (feedback_fron_connect < 0)
+    {
+        ESP_LOGE(SOCKET_TAG, "Failed to connect to the socket with error no: %d", feedback_fron_connect);
+        vTaskDelay(pdMS_TO_TICKS(500));
+        // close(sock);
+        // vTaskDelete(NULL);
+        // return;
+        }/* code */
+    
+    
+    ESP_LOGI(SOCKET_TAG, "client connected (we connected to the server)! ");
+
+    
+    while (1)
+    {
+        // send a message with handling the feedback from it
+        int feedack_from_send = send(sock, message, strlen(message), 0);
+        if (feedack_from_send < 0)
+        {
+            ESP_LOGE(SOCKET_TAG, "Error sending the message: error no %d", feedack_from_send);
+        }
+        else if (feedack_from_send == 0)
+        {
+            ESP_LOGI(SOCKET_TAG, "Connection closed by the server!!");
+        }
+        else
+        {
+            ESP_LOGI(SOCKET_TAG, "message sent!");
+        }
+        
+        
+        
+        // recieve response with handling the feedback from it
+        int feedback_from_recieve = recv(sock, rx_buffer, sizeof(rx_buffer)-1, 0);
+        if (feedback_from_recieve < 0)
+        {
+            ESP_LOGE(SOCKET_TAG, "Error recieving the message : error no %d", feedback_from_recieve);
+        }
+        else if (feedback_from_recieve == 0)
+        {
+            ESP_LOGI(SOCKET_TAG, "Connection closed by the server");
+        }
+        else
+        {
+            ESP_LOGI(SOCKET_TAG, "Message received: %s", rx_buffer);
+            if (strcmp(rx_buffer, "close") == 0)
+            {
+                break;
+            }
+            // response_from_vision = atof(rx_buffer);
+        }
+        
+        // Delay between the messages
+        vTaskDelay(3000 / portTICK_PERIOD_MS);
+    }
+
+    // Close the socket 
+    close(sock);
+    ESP_LOGI(SOCKET_TAG, "Socket closed!");
 }

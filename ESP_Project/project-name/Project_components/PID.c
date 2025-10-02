@@ -1,3 +1,4 @@
+
 #include "./PID.h"
 void pid_init(struct PID* pid, float Kp, float Ki, float Kd,float clearance, float output_min, float output_max) {
     pid->Kp = Kp;
@@ -10,6 +11,7 @@ void pid_init(struct PID* pid, float Kp, float Ki, float Kd,float clearance, flo
     pid->clearance = clearance;
     pid->output_min = output_min;
     pid->output_max = output_max;
+    pid->alpha = 0.9f;
 }
 
 void pid_compute(struct PID* pid, float error, float dt) {

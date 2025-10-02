@@ -6,12 +6,14 @@
 #include "../Project_components/Motor.h"
 #include "../Project_components/Encoder.h"
 #include "../Project_components/Serial.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
 
 // Timer flag for periodic interrupt
 
-#define E1_PIN_A 34
-#define E1_PIN_B 35
-#define M1_PIN_PWM 2
+#define E1_PIN_A 23
+#define E1_PIN_B 22
+#define M1_PIN_PWM 21
 #define M1_PIN_IN1 19
 #define M1_PIN_IN2 18
 
@@ -85,59 +87,59 @@ void app_main(void)
     motor_init(&motor1, M1_PIN_PWM, M1_PIN_IN1, M1_PIN_IN2, 50.0f, 255.0f,0);
     motor_init(&motor2, M2_PIN_PWM, M2_PIN_IN1, M2_PIN_IN2, 50.0f, 255.0f,1);
 
-    float m1_p, m1_i, m1_d;
-    float m2_p, m2_i, m2_d;
-    float outer_p, outer_i, outer_d;
-    float clearance;
-    float target_distance1, target_distance2;  // Add target distances
+    // float m1_p, m1_i, m1_d;
+    // float m2_p, m2_i, m2_d;
+    // float outer_p, outer_i, outer_d;
+    // float clearance;
+    // float target_distance1, target_distance2;  // Add target distances
     
-    // Read 12 parameters from serial: PID values + clearance + distances
-    printf("Enter PID parameters and target distances:\n");
-    fflush(stdout);
+    // // Read 12 parameters from serial: PID values + clearance + distances
+    // printf("Enter PID parameters and target distances:\n");
+    // fflush(stdout);
     
-    // Read 12 float parameters from serial input one by one
-    float* params[] = {&m1_p, &m1_i, &m1_d, &m2_p, &m2_i, &m2_d, &outer_p, &outer_i, &outer_d, &clearance, &target_distance1, &target_distance2};
-    const char* param_names[] = {
-        "m1_p", "m1_i", "m1_d", "m2_p", "m2_i", "m2_d", 
-        "outer_p", "outer_i", "outer_d", "clearance", 
-        "target_distance1_cm", "target_distance2_cm"
-    };
+    // // Read 12 float parameters from serial input one by one
+    // float* params[] = {&m1_p, &m1_i, &m1_d, &m2_p, &m2_i, &m2_d, &outer_p, &outer_i, &outer_d, &clearance, &target_distance1, &target_distance2};
+    // const char* param_names[] = {
+    //     "m1_p", "m1_i", "m1_d", "m2_p", "m2_i", "m2_d", 
+    //     "outer_p", "outer_i", "outer_d", "clearance", 
+    //     "target_distance1_cm", "target_distance2_cm"
+    // };
     
-    for (int i = 0; i < 12; ++i) {
-        serial_send_string("Enter value for:");
-        serial_send_string(param_names[i]);
-        printf("Enter %s: ", param_names[i]);
-        fflush(stdout);
+    // for (int i = 0; i < 12; ++i) {
+    //     serial_send_string("Enter value for:");
+    //     serial_send_string(param_names[i]);
+    //     printf("Enter %s: ", param_names[i]);
+    //     fflush(stdout);
         
-        // Use our serial function to receive float (blocking)
-        *params[i] = serial_receive_float();
+    //     // Use our serial function to receive float (blocking)
+    //     *params[i] = serial_receive_float();
         
-        printf("Received: %.6f\n", *params[i]);
-    }
+    //     printf("Received: %.6f\n", *params[i]);
+    // }
     
-    printf("All Params received:\n");
-    printf("Motor1 PID: %.2f %.2f %.2f\n", m1_p, m1_i, m1_d);
-    printf("Motor2 PID: %.2f %.2f %.2f\n", m2_p, m2_i, m2_d);
-    printf("Outer PID: %.2f %.2f %.2f\n", outer_p, outer_i, outer_d);
-    printf("Clearance: %.2f\n", clearance);
-    printf("Target Distance 1: %.2f cm\n", target_distance1);
-    printf("Target Distance 2: %.2f cm\n", target_distance2);
+    // printf("All Params received:\n");
+    // printf("Motor1 PID: %.2f %.2f %.2f\n", m1_p, m1_i, m1_d);
+    // printf("Motor2 PID: %.2f %.2f %.2f\n", m2_p, m2_i, m2_d);
+    // printf("Outer PID: %.2f %.2f %.2f\n", outer_p, outer_i, outer_d);
+    // printf("Clearance: %.2f\n", clearance);
+    // printf("Target Distance 1: %.2f cm\n", target_distance1);
+    // printf("Target Distance 2: %.2f cm\n", target_distance2);
     
     // Initialize PIDs with received parameters
-    pid_init(&pid1, m1_p, m1_i, m1_d, clearance, -12.0f, 12.0f);
-    pid_init(&pid2, m2_p, m2_i, m2_d, clearance, -12.0f, 12.0f);
-    pid_init(&pid_outer_loop, outer_p, outer_i, outer_d, clearance, -12.0f, 12.0f);
-    
+    pid_init(&pid1, 1.0f, 0.0f, 0.0f, 0.5f, -12.0f, 12.0f);
+    pid_init(&pid2, 1.0f, 0.0f, 0.0f, 0.5f, -12.0f, 12.0f);
+    pid_init(&pid_outer_loop, 1.0f, 0.0f, 0.0f, 0.5f, -12.0f, 12.0f);
     encoder_attach_isr(&encoder1, encoder_isr_1);
-    encoder_attach_isr(&encoder2, encoder_isr_2);
-    
+    // encoder_attach_isr(&encoder2, encoder_isr_2);
+    // Set target distances from serial input
+    encoder1.target_distance = 100; // Target distance in cm
+    encoder2.target_distance = 100; // Target distance in cm
+    timer_start();
     while (1) {
-        {
-            // Set target distances from serial input
-            encoder1.target_distance = target_distance1; // Target distance in cm
-            encoder2.target_distance = target_distance2; // Target distance in cm
-            timer_start();
-        }
+        
+      
+            
+        
         if(timer_flag) {
             // Inner loop PID for speed
             float error1 = encoder_get_error_distance(&encoder1); // Using error distance as a proxy for speed
@@ -158,5 +160,6 @@ void app_main(void)
             motor_set_ratio(&motor2, motor2_speed_ratio);
             timer_flag = 0;
         }
+        vTaskDelay(pdMS_TO_TICKS(10));
     }
 }

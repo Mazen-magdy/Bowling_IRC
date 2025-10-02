@@ -145,9 +145,18 @@ void app_main(void)
             float error1 = encoder_get_error_distance(&encoder1); // Using error distance as a proxy for speed
             float error2 = encoder_get_error_distance(&encoder2);
             if(error1 == 0 && error2 == 0){
+                printf("Target reached. Stopping motors.\n");
+                motor_set_ratio(&motor1, 0.0f);
+                motor_set_ratio(&motor2, 0.0f);
                 timer_stop();  // Stop the timer when no error
                 timer_flag = 0;
                 continue;  // Skip PID computation
+            }
+            if(error1 != 0){
+                motor_set_ratio(&motor1,0.0f); // Reset counts for next interval
+            }
+            if(error2 != 0){
+                motor_set_ratio(&motor2,0.0f); // Reset counts for next interval
             }
             pid_compute(&pid1, error1, 0.015f);
             pid_compute(&pid2, error2, 0.015f);

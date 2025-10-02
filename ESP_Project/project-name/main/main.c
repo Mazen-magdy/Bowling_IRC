@@ -8,6 +8,7 @@
 #include "../Project_components/Serial.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include "esp_log.h"
 
 // Timer flag for periodic interrupt
 
@@ -26,6 +27,8 @@
 // ============ Global Variables ============//
 int timer_flag = 0;
 esp_timer_handle_t Motor_Timer;  // Global timer handle for control
+
+static const char *TAG = "MOTOR_CONTROL";
 
 struct Encoder encoder1;
 struct Encoder encoder2;
@@ -149,10 +152,12 @@ void app_main(void)
         
         if(timer_flag) {
             // Inner loop PID for speed
-            float error1 = encoder_get_error_distance(&encoder1); // Using error distance as a proxy for speed
+            float error1 = encoder_get_error_distance(&encoder1);
+            ESP_LOGE(TAG, "Encoder 1 error distance: %.2f\n", error1); // Using error distance as a proxy for speed
             float error2 = encoder_get_error_distance(&encoder2);
+            ESP_LOGE(TAG, "Encoder 2 error distance: %.2f\n", error2);
             if(error1 == 0 && error2 == 0){
-                printf("Target reached. Stopping motors.\n");
+                ESP_LOGI(TAG,"Target reached. Stopping motors.\n");
                 motor_set_ratio(&motor1, 0.0f);
                 motor_set_ratio(&motor2, 0.0f);
                 timer_stop();  // Stop the timer when no error

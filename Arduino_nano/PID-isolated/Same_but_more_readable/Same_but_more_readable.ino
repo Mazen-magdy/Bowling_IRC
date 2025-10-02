@@ -1,14 +1,20 @@
 // ====================     INCLUDES     ====================
 #include <Adafruit_AHRS.h>
 #include <Adafruit_AHRS_FusionInterface.h>
-#include <Adafruit_AHRS_Madgwick.h>
 #include <Adafruit_AHRS_Mahony.h>
 #include <Adafruit_AHRS_NXPFusion.h>
 #include <Adafruit_Sensor_Set.h>
 #include <Adafruit_Simple_AHRS.h>
-#include <Adafruit_MPU6050.h>
 #include <math.h>
+#include <Wire.h>
+#include <Adafruit_MPU6050.h>
+#include <Adafruit_Sensor.h>
+#include <Adafruit_AHRS_Madgwick.h>
+
 // ====================     DEFINES      ====================
+// mpu
+Adafruit_MPU6050 mpu;
+Adafruit_Madgwick filter; // Madgwick sensor fusion filter
 
 // Motor 1 Pins
 #define E1_Pin1 3 // has interrupt
@@ -82,10 +88,6 @@ class Encoder{
 // --- encoder
 Encoder E1(990,40.84,E1_Pin1,E1_Pin2); // For Motor 1 
 Encoder E2(990,40.84,E2_Pin1,E2_Pin2); // For Motor 2 
-
-// --- mpu 
-Adafruit_MPU6050 mpu;
-Adafruit_Madgwick filter;  // or Adafruit_Mahony filter
 
 // ==================== GLOBAL VARIABLES ====================
 
@@ -182,7 +184,7 @@ float start_Yaw;
 bool start_Yaw_flag       = false;
 // --- needed variables for PID controlling ---
 float last_Yaw;
-float yaw_Target;
+float yaw_Target = 90;
 float yaw_last_error;
 unsigned long last_Time; // in ms
 float yaw_Integral;
@@ -235,22 +237,54 @@ float get_Yaw_angle(){
   return yaw;
 } // needs Delay for 10ms
 
+// 
+// Initialize MPU6050 and filter
+void initMPU6050() {
+  if (!mpu.begin()) {
+    Serial.println("Failed to find MPU6050 chip");
+    while (1) delay(10);
+  }
+
+  mpu.setAccelerometerRange(MPU6050_RANGE_8_G);
+  mpu.setGyroRange(MPU6050_RANGE_500_DEG);
+  mpu.setFilterBandwidth(MPU6050_BAND_21_HZ);
+
+  filter.begin(25); // 25 Hz update rate
+}
+
+// Function that returns yaw angle (with sensor fusion)
+float getYawAngle() {
+  sensors_event_t a, g, temp;
+  mpu.getEvent(&a, &g, &temp);
+
+  // Update fusion filter
+  filter.updateIMU(
+    g.gyro.x, g.gyro.y, g.gyro.z,
+    a.acceleration.x, a.acceleration.y, a.acceleration.z
+  );
+
+  return filter.getYaw(); // in degrees
+}
+
 // ==================== ROTATION PID CONTROLLER ====================
 
 void yaw_PID_Controller(){
   if(yaw_Reached) return;
-
+  float test = millis() - last_Time;
+  Serial.println(test);
   if(millis() - last_Time >= 10){
-      // Serial.println("calcuate yaw :");
-      yaw = get_Yaw_angle(); 
+      Serial.println("calcuate yaw :");
+      yaw = getYawAngle(); 
       float error = yaw_Target - yaw;
-      // Serial.print("errorAngle:"); Serial.print(error); Serial.print(',');
-      if(error < yaw_Clearence){
+      Serial.print("error: "); Serial.println(error);
+      Serial.print("errorAngle:"); Serial.print(error); Serial.print(',');
+      if(abs(error) < yaw_Clearence){
+        Serial.println("in if ");
         //stop
         yaw_Reached = true;
         return;
       }
-
+      Serial.println("pass if condition");
       float dt = 0.01;
 
       yaw_Integral += (error + yaw_last_error) / 2 * dt;
@@ -261,7 +295,7 @@ void yaw_PID_Controller(){
                        (1 - yaw_Alpha) * yaw_last_D_filtered;
 
       float V = yaw_P * error + yaw_I * yaw_Integral - yaw_D * D_filtered;
-      // Serial.print("Voltage_Angle:"); Serial.print(V/2); Serial.print(",");
+      Serial.print("Voltage_Angle:"); Serial.print(V/2); Serial.print(",");
        Motor1_Motion(V/2);
        Motor2_Motion(-1 * V/2);
 
@@ -269,6 +303,7 @@ void yaw_PID_Controller(){
        yaw_last_D_filtered = D_filtered;
        last_Yaw = yaw;
        last_Time = millis();
+       Serial.println("End of the yaw ");
   }
 }
 
@@ -524,8 +559,8 @@ void Motor2_Motion(float speed){
 void setup() {
   // setup interrupt on Timer1 with OCR1A , OCR1B
   Serial.begin(9600);
-  // Serial.println("started");
-
+  Serial.println("started");
+  initMPU6050();
   pinMode(E1_Pin1, INPUT);
   pinMode(E1_Pin2, INPUT);
   pinMode(E2_Pin1, INPUT);
@@ -547,41 +582,41 @@ void setup() {
   // // // get data from user
     //  Serial.println("Enter P I D for M1");
     //  Serial.print("initials is " ); Serial.print(M1_P); Serial.print(" "); Serial.print(M1_I); Serial.print(" "); Serial.print(M1_D); 
-      while(!Serial.available());
-      M1_P = Serial.parseFloat();
-      // Serial.print("M1_P "); Serial.println(M1_P);
-      while(!Serial.available());
-      M1_I = Serial.parseFloat();
-      // Serial.print("M1_I "); Serial.println(M1_I);
-      while(!Serial.available());
-      M1_D = Serial.parseFloat();
-      // Serial.print("M1_D "); Serial.println(M1_D);
+      // while(!Serial.available());
+      // M1_P = Serial.parseFloat();
+      // // Serial.print("M1_P "); Serial.println(M1_P);
+      // while(!Serial.available());
+      // M1_I = Serial.parseFloat();
+      // // Serial.print("M1_I "); Serial.println(M1_I);
+      // while(!Serial.available());
+      // M1_D = Serial.parseFloat();
+      // // Serial.print("M1_D "); Serial.println(M1_D);
 
-      // Serial.println("Enter P I D for M2");
-      // Serial.print("initials is " ); Serial.print(M2_P); Serial.print(" "); Serial.print(M2_I); Serial.print(" "); Serial.print(M2_D);
-      while(!Serial.available());
-      M2_P = Serial.parseFloat();
-      // Serial.print("M2_P "); Serial.println(M2_P);
-      while(!Serial.available());
-      M2_I = Serial.parseFloat();
-      // Serial.print("M2_I "); Serial.println(M2_I);
-      while(!Serial.available());
-      M2_D = Serial.parseFloat();
-      // Serial.print("M2_D "); Serial.println(M2_D);
-      while(!Serial.available());
-      P_sync = Serial.parseFloat();
-      // Serial.print("P_sync "); Serial.println(P_sync);
-      while(!Serial.available());
-      I_sync = Serial.parseFloat();
-      // Serial.print("I_sync "); Serial.println(I_sync);
-      while(!Serial.available());
-      D_sync = Serial.parseFloat();
-      // Serial.print("D_sync "); Serial.println(D_sync);
-      while(!Serial.available());
-      K_correction = Serial.parseFloat();
-      // Serial.print("K_correction "); Serial.println(K_correction);
-      while(!Serial.available());
-      distance = Serial.parseFloat();
+      // // Serial.println("Enter P I D for M2");
+      // // Serial.print("initials is " ); Serial.print(M2_P); Serial.print(" "); Serial.print(M2_I); Serial.print(" "); Serial.print(M2_D);
+      // while(!Serial.available());
+      // M2_P = Serial.parseFloat();
+      // // Serial.print("M2_P "); Serial.println(M2_P);
+      // while(!Serial.available());
+      // M2_I = Serial.parseFloat();
+      // // Serial.print("M2_I "); Serial.println(M2_I);
+      // while(!Serial.available());
+      // M2_D = Serial.parseFloat();
+      // // Serial.print("M2_D "); Serial.println(M2_D);
+      // while(!Serial.available());
+      // P_sync = Serial.parseFloat();
+      // // Serial.print("P_sync "); Serial.println(P_sync);
+      // while(!Serial.available());
+      // I_sync = Serial.parseFloat();
+      // // Serial.print("I_sync "); Serial.println(I_sync);
+      // while(!Serial.available());
+      // D_sync = Serial.parseFloat();
+      // // Serial.print("D_sync "); Serial.println(D_sync);
+      // while(!Serial.available());
+      // K_correction = Serial.parseFloat();
+      // // Serial.print("K_correction "); Serial.println(K_correction);
+      // while(!Serial.available());
+      // distance = Serial.parseFloat();
       // Serial.print("distance "); Serial.println(distance);
 
       // Serial.println("started");
@@ -598,39 +633,39 @@ void loop() {
 
 
     //---- PID_Intialization ----
-      if(!M1_target_set){
-        M1_startPoint = E1.Get_Moved_distance_from_launch();
-        E1.set_target(distance);
-        startTime = millis();
-        M1_target_set = true;
-      }
-      if(!M2_target_set){
-        M2_startPoint = E2.Get_Moved_distance_from_launch();
-        E2.set_target(distance);
-        M2_target_set = true;
-      }
-    //
-    run_motors_PID_controller(); 
+    //   if(!M1_target_set){
+    //     M1_startPoint = E1.Get_Moved_distance_from_launch();
+    //     E1.set_target(distance);
+    //     startTime = millis();
+    //     M1_target_set = true;
+    //   }
+    //   if(!M2_target_set){
+    //     M2_startPoint = E2.Get_Moved_distance_from_launch();
+    //     E2.set_target(distance);
+    //     M2_target_set = true;
+    //   }
+    // //
+    // run_motors_PID_controller(); 
 
-    PID_motion_M1();
-    PID_motion_M2();
+    // PID_motion_M1();
+    // PID_motion_M2();
 
-      // Print all values in one row for Serial Plotter
-    Serial.print(millis() / 1000);  Serial.print(",");
-    Serial.print(E1_error);         Serial.print(",");
-    Serial.print(V1_out);           Serial.print(",");
-    Serial.print(Signal1);          Serial.print(",");
-    Serial.print(E2_error);         Serial.print(",");
-    Serial.print(V2_out);           Serial.print(",");
-    Serial.println(Signal2); // newline ends this row
+    //   // Print all values in one row for Serial Plotter
+    // Serial.print(millis() / 1000);  Serial.print(",");
+    // Serial.print(E1_error);         Serial.print(",");
+    // Serial.print(V1_out);           Serial.print(",");
+    // Serial.print(Signal1);          Serial.print(",");
+    // Serial.print(E2_error);         Serial.print(",");
+    // Serial.print(V2_out);           Serial.print(",");
+    // Serial.println(Signal2); // newline ends this row
   //
   // // ================= ROTATION PID CONTROL TESTING =================
   //   // get data from user
     // if(!user_Data){
     
     // }
-  //  yaw_PID_Controller();
-  //
+   yaw_PID_Controller();
+  
 
 
   // user_Data = true; // prevent input in the next all loop just first time it asks

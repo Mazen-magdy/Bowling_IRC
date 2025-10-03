@@ -10,6 +10,7 @@ void encoder_init(struct Encoder* encoder, int pin_A, int pin_B, float CPR, floa
     encoder->target_distance = 0.0f;
 
     // Initialize GPIO pins
+
     gpio_set_direction(pin_A, GPIO_MODE_INPUT);
     gpio_set_direction(pin_B, GPIO_MODE_INPUT);
 }
@@ -38,8 +39,11 @@ float encoder_get_error_distance(struct Encoder* encoder) {
     return encoder->target_distance - encoder_get_distance(encoder);
 }
 
-void encoder_attach_isr(struct Encoder* encoder, void (*isr_handler)(void)) {
+void encoder_attach_isr(struct Encoder* encoder) {
+    gpio_reset_pin(encoder->pin_A);
+    gpio_set_direction(encoder->pin_A, GPIO_MODE_INPUT);
+    gpio_set_pull_mode(encoder->pin_A, GPIO_PULLUP_ONLY);
     gpio_set_intr_type(encoder->pin_A, GPIO_INTR_ANYEDGE);
     gpio_install_isr_service(0);
-    gpio_isr_handler_add(encoder->pin_A, (gpio_isr_t)isr_handler, (void*) encoder);
-}
+    // remaining add isr handler and enable interrupt
+}   

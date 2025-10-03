@@ -79,6 +79,14 @@ void app_main(void)
 {
     serial_init();
     setup_periodic_timer();
+    // attach interrupts to encoders
+    encoder_attach_isr(&encoder1);
+    encoder_attach_isr(&encoder2);
+    gpio_isr_handler_add(encoder1.pin_A, encoder_isr_1, NULL);
+    gpio_isr_handler_add(encoder2.pin_A, encoder_isr_2, NULL);
+    gpio_intr_enable(encoder1.pin_A);
+    gpio_intr_enable(encoder2.pin_A);
+
     encoder_init(&encoder1, E1_PIN_A, E1_PIN_B, 990.0f, 40.84f);
     encoder_init(&encoder2, E2_PIN_A, E2_PIN_B, 990.0f, 40.84f);
 
@@ -128,10 +136,6 @@ void app_main(void)
     pid_init(&pid1, m1_p, m1_i, m1_d, clearance, -12.0f, 12.0f);
     pid_init(&pid2, m2_p, m2_i, m2_d, clearance, -12.0f, 12.0f);
     pid_init(&pid_outer_loop, outer_p, outer_i, outer_d, clearance, -12.0f, 12.0f);
-    
-    encoder_attach_isr(&encoder1, encoder_isr_1);
-    encoder_attach_isr(&encoder2, encoder_isr_2);
-    
     while (1) {
         {
             // Set target distances from serial input
@@ -146,7 +150,7 @@ void app_main(void)
             if(error1 == 0 && error2 == 0){
                 timer_stop();  // Stop the                 printf("Target reached. Stopping motors.\n");
                 motor_set_ratio(&motor1, 0.0f);
-                motor_set_ratio(&motor2, 0.0f);ror
+                motor_set_ratio(&motor2, 0.0f);
                 timer_flag = 0;
                 continue;  // Skip PID computation
             }

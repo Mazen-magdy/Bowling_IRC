@@ -28,18 +28,16 @@ void motor_init(struct Motor* motor, int pin_PWM, int pin_IN1, int pin_IN2, floa
     gpio_set_level(pin_IN2, 0);
     
     // Configure LEDC timer (shared by both channels)
-    static bool timer_configured = false;
-    if (!timer_configured) {
-        ledc_timer_config_t ledc_timer = {
-            .duty_resolution = PWM_RESOLUTION,
-            .freq_hz = PWM_FREQ_HZ,
-            .speed_mode = LEDC_LOW_SPEED_MODE,
-            .timer_num = LEDC_TIMER_0,
-            .clk_cfg = LEDC_AUTO_CLK,
-        };
-        ledc_timer_config(&ledc_timer);
-        timer_configured = true;
-    }
+
+    ledc_timer_config_t ledc_timer = {
+        .duty_resolution = PWM_RESOLUTION,
+        .freq_hz = PWM_FREQ_HZ,
+        .speed_mode = LEDC_LOW_SPEED_MODE,
+        .timer_num = LEDC_TIMER_0,
+        .clk_cfg = LEDC_AUTO_CLK,
+    };
+    ledc_timer_config(&ledc_timer);
+
 
     // Determine which channel to use based on PWM pin
     ledc_channel_t channel;

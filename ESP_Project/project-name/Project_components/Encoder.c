@@ -19,8 +19,11 @@ void encoder_update(struct Encoder* encoder) { // will be ISR for pin A change
         encoder->counts++;
     } 
     else if(gpio_get_level(encoder->pin_A) == 1 &&  gpio_get_level(encoder->pin_B) == 0) {
-        encoder->counts--;
+        encoder->counts++;
     }   
+    else {
+        encoder->counts--;
+    }
 }
 int32_t encoder_get_counts(struct Encoder* encoder) {
     return encoder->counts;
@@ -46,4 +49,5 @@ void encoder_attach_isr(struct Encoder* encoder) {
     gpio_set_intr_type(encoder->pin_A, GPIO_INTR_ANYEDGE);
     gpio_install_isr_service(0);
     // remaining add isr handler and enable interrupt
+    // made in main file
 }   

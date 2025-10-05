@@ -136,32 +136,34 @@ void app_main(void)
     pid_init(&pid1, m1_p, m1_i, m1_d, clearance, -12.0f, 12.0f);
     pid_init(&pid2, m2_p, m2_i, m2_d, clearance, -12.0f, 12.0f);
     pid_init(&pid_outer_loop, outer_p, outer_i, outer_d, clearance, -12.0f, 12.0f);
+
+    encoder1.target_distance = target_distance1; // Target distance in cm
+    encoder2.target_distance = target_distance2; // Target distance in cm
+
+    timer_start();
     while (1) {
-        {
-            // Set target distances from serial input
-            encoder1.target_distance = target_distance1; // Target distance in cm
-            encoder2.target_distance = target_distance2; // Target distance in cm
-            timer_start();
-        }
         if(timer_flag) {
             // Inner loop PID for speed
             float error1 = encoder_get_error_distance(&encoder1); // Using error distance as a proxy for speed
             float error2 = encoder_get_error_distance(&encoder2);
             if(error1 == 0 && error2 == 0){
-                timer_stop();  // Stop the                 printf("Target reached. Stopping motors.\n");
+                timer_stop();  // Stop the
+                printf("Target reached. Stopping motors.\n");
                 motor_set_ratio(&motor1, 0.0f);
                 motor_set_ratio(&motor2, 0.0f);
                 timer_flag = 0;
                 continue;  // Skip PID computation
             }
-            pid_compute(&pid1, error1, 0.015f);
           
             if(error1 != 0){
                 motor_set_ratio(&motor1,0.0f); // Reset counts for next interval
             }
             if(error2 != 0){
                 motor_set_ratio(&motor2,0.0f); // Reset counts for next interval
-            }  pid_compute(&pid2, error2, 0.015f);
+            } 
+
+            pid_compute(&pid1, error1, 0.015f);
+            pid_compute(&pid2, error2, 0.015f);
             // Outer loop PID for position
             float outer_error = error1 - error2;
             pid_compute(&pid_outer_loop, outer_error, 0.015f);

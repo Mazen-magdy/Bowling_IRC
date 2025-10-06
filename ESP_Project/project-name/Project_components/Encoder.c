@@ -1,4 +1,5 @@
 #include "./Encoder.h"
+#include <driver/gpio.h>
 void encoder_init(struct Encoder* encoder, int pin_A, int pin_B, float CPR, float circumference) {
     encoder->pin_A = pin_A;
     encoder->pin_B = pin_B;
@@ -9,6 +10,7 @@ void encoder_init(struct Encoder* encoder, int pin_A, int pin_B, float CPR, floa
     encoder->target_distance = 0.0f;
 
     // Initialize GPIO pins
+
     gpio_set_direction(pin_A, GPIO_MODE_INPUT);
     gpio_set_direction(pin_B, GPIO_MODE_INPUT);
 }
@@ -37,17 +39,11 @@ float encoder_get_error_distance(struct Encoder* encoder) {
     return encoder->target_distance - encoder_get_distance(encoder);
 }
 
-void encoder_attach_isr(struct Encoder* encoder, void (*isr_handler)(void)) {
-    // Configure GPIO
-    gpio_config_t io_conf = {
-        .intr_type = GPIO_INTR_ANYEDGE,  // interrupt on rising and falling edge
-        .mode = GPIO_MODE_INPUT,
-        .pin_bit_mask = (1ULL << encoder->pin_A),
-        .pull_down_en = 0,
-        .pull_up_en = 1  // or 0, depending on your circuit
-    };
-    gpio_config(&io_conf);
-
-    // Attach ISR
-    gpio_isr_handler_add(encoder->pin_A, (gpio_isr_t)isr_handler, (void*) encoder);
-}
+void encoder_attach_isr(struct Encoder* encoder) {
+    gpio_reset_pin(encoder->pin_A);
+    gpio_set_direction(encoder->pin_A, GPIO_MODE_INPUT);
+    gpio_set_pull_mode(encoder->pin_A, GPIO_PULLUP_ONLY);
+    gpio_set_intr_type(encoder->pin_A, GPIO_INTR_ANYEDGE);
+    gpio_install_isr_service(0);
+    // remaining add isr handler and enable interrupt
+}   

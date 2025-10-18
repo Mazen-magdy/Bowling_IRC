@@ -5,7 +5,6 @@
   "idf.openOcdConfigs": [
     "board/esp32-wrover-kit-3.3v.cfg"
   ],
-  "idf.portWin": "COM11",
   "idf.toolsPathWin": "D:\\Education\\softwares\\Espressif",
   "idf.customExtraVars": {
     "IDF_TARGET": "esp32"
@@ -17,10 +16,10 @@
     "--compile-commands-dir=${workspaceFolder}\\build"
   ],
   "idf.flashType": "UART",
+  "idf.portWin": "COM11",
   "files.associations": {
-    "encoder.h": "c",
     "gpio.h": "c",
-    "pid.h": "c",
-    "cstdio": "c"
+    "stdint.h": "c",
+    "encoder.h": "c"
   }
 }

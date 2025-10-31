@@ -20,6 +20,9 @@
   "files.associations": {
     "gpio.h": "c",
     "stdint.h": "c",
-    "encoder.h": "c"
+    "encoder.h": "c",
+    "motor_pid_encoded.h": "c",
+    "esp_wifi.h": "c",
+    "ledc.h": "c"
   }
 }

@@ -1,16 +1,14 @@
-#include "../project_components/Motor.h"
-#include "main.h"
+#include "Wifi.h"
 
-struct Motor motor1;
-struct Motor motor2;
 
 // FreeRTOS event group to handle Wi-Fi events
 static EventGroupHandle_t s_wifi_event_group;
 
+
 // TAG for ESP_LOG messages
 static const char *TAG = "wifi_station";
 static const char *SOCKET_TAG = "Socket_client";
-static const char *motor_motion = "Motor_motion";
+
 // Wi-Fi event handler function
 static void event_handler(void* arg, esp_event_base_t event_base,
                           int32_t event_id, void* event_data)
@@ -114,7 +112,7 @@ void wifi_start()
         // YOUR APPLICATION CODE STARTS HERE!
         // e.g., Start a web server, connect to MQTT, etc.
 
-        socket_client_setup_1();
+        // socket_client_setup_1();
 
         while(1) {
             printf("Wi-Fi is connected! Doing my job...\n");
@@ -128,18 +126,10 @@ void wifi_start()
     }
 }
 
-void app_main(void)
-{
-    
-    motor_init(&motor1, 18, 19, 21, 0.0f, 255.0f, 0); // PWM pin, IN1, IN2, min PWM, max PWM, channel
-    motor_init(&motor2, 2, 4, 16, 0.0f, 255.0f, 0); // PWM pin, IN1, IN2, min PWM, max PWM, channel
-    wifi_start();
-}
-
-void socket_client_setup_1()
+void socket_client_setup_1() // take message from server 
 {
     char *message = "Hello from esp!";
-    char rx_buffer[3];
+    char rx_buffer[128];
     struct sockaddr_in dest_addr;
 
 
@@ -208,7 +198,6 @@ void socket_client_setup_1()
         else
         {
             ESP_LOGI(SOCKET_TAG, "Message received: %s", rx_buffer);
-            take_desicion(rx_buffer[0]);
             if (strcmp(rx_buffer, "close") == 0)
             {
                 break;
@@ -217,43 +206,10 @@ void socket_client_setup_1()
         }
         
         // Delay between the messages
-        vTaskDelay(50 / portTICK_PERIOD_MS);
+        vTaskDelay(3000 / portTICK_PERIOD_MS);
     }
 
     // Close the socket 
     close(sock);
     ESP_LOGI(SOCKET_TAG, "Socket closed!");
-}
-
-
-void take_desicion(char c)
-{
-    char read = c;
-        switch(read){
-            case 's':
-            motor_set_ratio(&motor1,0);
-            motor_set_ratio(&motor2,0);
-            break;
-            case 'f':
-            motor_set_ratio(&motor1,1);
-            motor_set_ratio(&motor2,1);
-            break;
-            case 'b':
-            motor_set_ratio(&motor1,1);
-            motor_set_ratio(&motor2,1);
-            break;
-            case 'r':
-            motor_set_ratio(&motor1,1);
-            motor_set_ratio(&motor2,-1);
-            break;
-            case 'l':
-            motor_set_ratio(&motor1,-1);
-            motor_set_ratio(&motor2,1);
-            break;
-            default:
-            motor_set_ratio(&motor1,0);
-            motor_set_ratio(&motor2,0);
-            break;
-        
-    }
 }

@@ -2,6 +2,7 @@
 #include "driver/gpio.h"
 #include "driver/ledc.h"
 #include <math.h>
+#include <stdio.h>
 
 #define PWM_FREQ_HZ 5000
 #define PWM_RESOLUTION LEDC_TIMER_8_BIT
@@ -20,12 +21,12 @@ void motor_init(struct Motor* motor, int pin_PWM, int pin_IN1, int pin_IN2, floa
     motor->channel = LEDC_CHANNEL_0;
     }
     // Initialize GPIO pins for direction control
-    gpio_set_direction(pin_IN1, GPIO_MODE_OUTPUT);
-    gpio_set_direction(pin_IN2, GPIO_MODE_OUTPUT);
+    // gpio_set_direction(pin_IN1, GPIO_MODE_OUTPUT);
+    // gpio_set_direction(pin_IN2, GPIO_MODE_OUTPUT);
 
-    // Set initial state (motor stopped)
-    gpio_set_level(pin_IN1, 0);
-    gpio_set_level(pin_IN2, 0);
+    // // Set initial state (motor stopped)
+    // gpio_set_level(pin_IN1, 1);
+    // gpio_set_level(pin_IN2, 1);
     
     // Configure LEDC timer (shared by both channels)
 
@@ -58,14 +59,19 @@ void motor_init(struct Motor* motor, int pin_PWM, int pin_IN1, int pin_IN2, floa
 void motor_set_ratio(struct Motor* motor, float ratio) {
     // Clamp ratio between -1.0 and 1.0 using math.h functions
     ratio = fmaxf(fminf(ratio, 1.0f), -1.0f);
-    
+    printf("ratio : %f",ratio);
     uint32_t duty = 0;
     
     if (ratio > 0.0f) {
         // Forward direction
+         // Initialize GPIO pins for direction control
+        gpio_set_direction(motor->pin_IN1, GPIO_MODE_OUTPUT);
+        gpio_set_direction(motor->pin_IN2, GPIO_MODE_OUTPUT);
+       
+        // Set initial state (motor stopped)
         gpio_set_level(motor->pin_IN1, 1);
         gpio_set_level(motor->pin_IN2, 0);
-        
+        printf("set in1 in2 : %d %d", 1,0) ;
         // Apply minimum PWM if needed using math.h
         float min_ratio = motor->min_PWM / 255.0f;
         ratio = fmaxf(ratio, min_ratio);
@@ -74,9 +80,13 @@ void motor_set_ratio(struct Motor* motor, float ratio) {
     }
     else if (ratio < 0.0f) {
         // Reverse direction
+         gpio_set_direction(motor->pin_IN1, GPIO_MODE_OUTPUT);
+        gpio_set_direction(motor->pin_IN2, GPIO_MODE_OUTPUT);
+
+        // Set initial state (motor stopped)
         gpio_set_level(motor->pin_IN1, 0);
         gpio_set_level(motor->pin_IN2, 1);
-        
+        printf("set in1 in2 : %d %d", 0,1) ;
         // Apply minimum PWM if needed using math.h
         float min_ratio = motor->min_PWM / 255.0f;
         float abs_ratio = fabsf(ratio);  // Use fabsf from math.h

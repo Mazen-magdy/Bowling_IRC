@@ -12,12 +12,13 @@
 #define I2C_MASTER_FREQ_HZ          100000
 #define I2C_MASTER_TIMEOUT_MS       1000
 
-#define MPU6050_ADDR                0x68
+#define MPU6050_ADDR               0x68
 #define MPU6050_PWR_MGMT_1         0x6B
 #define MPU6050_ACCEL_XOUT_H       0x3B
+#define MPU6050_GYRO_XOUT_H        0x43
 #define RAD_TO_DEG                  57.2957795131
 
-void MPU6050();
+double get_angle();
 
 
 #endif

@@ -8,31 +8,24 @@ static EventGroupHandle_t s_wifi_event_group;
 // TAG for ESP_LOG messages
 static const char *TAG = "wifi_station";
 static const char *SOCKET_TAG = "Socket_client";
-
+static const char *motor_motion = "Motor_motion";
 // Wi-Fi event handler function
-static void event_handler(void* arg, esp_event_base_t event_base,
+static void event_handler(void* arg, esp_event_base_t event_base, 
                           int32_t event_id, void* event_data)
 {
     if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_START) {
         // The station has been initialized, now we can connect
         esp_wifi_connect();
+
     } else if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_DISCONNECTED) {
         // The connection was lost or failed
         esp_wifi_connect(); // Try to reconnect
-
-        /*-------we will delete them for now and we will see-------------*/
-
-        // xEventGroupClearBits(s_wifi_event_group, WIFI_CONNECTED_BIT);
-        // xEventGroupSetBits(s_wifi_event_group, WIFI_FAIL_BIT);
-
         ESP_LOGI(TAG, "Failed to connect to AP. Retrying...");
+
     } else if (event_base == IP_EVENT && event_id == IP_EVENT_STA_GOT_IP) {
         // Success! We got an IP address from the router
         ip_event_got_ip_t* event = (ip_event_got_ip_t*) event_data;
         ESP_LOGI(TAG, "Got IP: " IPSTR, IP2STR(&event->ip_info.ip));
-
-        // esp_ip = event->ip_info.ip;
-        
         xEventGroupSetBits(s_wifi_event_group, WIFI_CONNECTED_BIT);
     }
 }
@@ -108,18 +101,10 @@ void wifi_start()
 
     // Check which event caused us to exit the wait
     if (bits & WIFI_CONNECTED_BIT) {
+        // connected to the wifi
         ESP_LOGI(TAG, "Connected to AP successfully!");
-        // YOUR APPLICATION CODE STARTS HERE!
-        // e.g., Start a web server, connect to MQTT, etc.
-
-        // socket_client_setup_1();
-
-        while(1) {
-            printf("Wi-Fi is connected! Doing my job...\n");
-            vTaskDelay(2000 / portTICK_PERIOD_MS);
-        }
-
     } else if (bits & WIFI_FAIL_BIT) {
+        // failed to connect
         ESP_LOGI(TAG, "Failed to connect to AP.");
     } else {
         ESP_LOGE(TAG, "UNEXPECTED EVENT");
@@ -134,17 +119,17 @@ void app_main(void)
 void socket_client_setup_1()
 {
     char *message = "Hello from esp!";
-    char rx_buffer[128];
-    struct sockaddr_in dest_addr;
+    char rx_buffer[128]; // the recieved message will be stored here
+    struct sockaddr_in dest_addr; 
 
 
-    //configure client ?? address
-    dest_addr.sin_family = AF_INET;
-    dest_addr.sin_port = htons(port);
-    dest_addr.sin_addr.s_addr = inet_addr(ip_address);   
+    //configure server destination address
+    dest_addr.sin_family = AF_INET;     // make it IPv4
+    dest_addr.sin_port = htons(port);   // defining the port of the server
+    dest_addr.sin_addr.s_addr = inet_addr(ip_address);   // defining the ip-address of the server
     
     // creating socket
-    int sock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+    int sock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP); // IPv4 , TCP , protocol
     if (sock < 0)
     {
         ESP_LOGE(TAG, "Failed to create socket !");
@@ -155,66 +140,82 @@ void socket_client_setup_1()
 
     // connecting the socket
     /*connect the socket with the address given and the size of memory needed*/
-
     int feedback_fron_connect;
     feedback_fron_connect = connect(sock, (struct sockaddr *)&dest_addr, sizeof(dest_addr));
     if (feedback_fron_connect < 0)
     {
         ESP_LOGE(SOCKET_TAG, "Failed to connect to the socket with error no: %d", feedback_fron_connect);
         vTaskDelay(pdMS_TO_TICKS(500));
-        // close(sock);
-        // vTaskDelete(NULL);
-        // return;
-        }/* code */
-    
-    
+        close(sock);
+        vTaskDelete(NULL);
+        return;
+    }
     ESP_LOGI(SOCKET_TAG, "client connected (we connected to the server)! ");
 
     
-    while (1)
+    
+    // send a message with handling the feedback from it
+    int feedack_from_send = send(sock, message, strlen(message), 0);
+    if (feedack_from_send < 0)
     {
-        // send a message with handling the feedback from it
-        int feedack_from_send = send(sock, message, strlen(message), 0);
-        if (feedack_from_send < 0)
-        {
-            ESP_LOGE(SOCKET_TAG, "Error sending the message: error no %d", feedack_from_send);
-        }
-        else if (feedack_from_send == 0)
-        {
-            ESP_LOGI(SOCKET_TAG, "Connection closed by the server!!");
-        }
-        else
-        {
-            ESP_LOGI(SOCKET_TAG, "message sent!");
-        }
+        ESP_LOGE(SOCKET_TAG, "Error sending the message: error no %d", feedack_from_send);
+    }
+    else if (feedack_from_send == 0)
+    {
+        ESP_LOGI(SOCKET_TAG, "Connection closed by the server!!");
+    }
+    else
+    {
+        ESP_LOGI(SOCKET_TAG, "message sent!");
+    }
         
         
         
-        // recieve response with handling the feedback from it
-        int feedback_from_recieve = recv(sock, rx_buffer, sizeof(rx_buffer)-1, 0);
-        if (feedback_from_recieve < 0)
+    // recieve response with handling the feedback from it
+    int feedback_from_recieve = recv(sock, rx_buffer, sizeof(rx_buffer)-1, 0);
+    if (feedback_from_recieve < 0)
         {
             ESP_LOGE(SOCKET_TAG, "Error recieving the message : error no %d", feedback_from_recieve);
         }
-        else if (feedback_from_recieve == 0)
+    else if (feedback_from_recieve == 0)
         {
             ESP_LOGI(SOCKET_TAG, "Connection closed by the server");
         }
-        else
+    else
         {
             ESP_LOGI(SOCKET_TAG, "Message received: %s", rx_buffer);
-            if (strcmp(rx_buffer, "close") == 0)
-            {
-                break;
-            }
-            // response_from_vision = atof(rx_buffer);
         }
         
-        // Delay between the messages
-        vTaskDelay(3000 / portTICK_PERIOD_MS);
-    }
+    // Delay between the messages
+    vTaskDelay(50 / portTICK_PERIOD_MS);
+    
 
     // Close the socket 
     close(sock);
     ESP_LOGI(SOCKET_TAG, "Socket closed!");
+}
+
+
+void take_desicion(char c)
+{
+    switch (c)
+    {
+    case 'f':
+        ESP_LOGI(motor_motion, "move forward!");
+        break;
+    case 'l':
+        ESP_LOGI(motor_motion, "move left!");
+        break;
+    case 'r':
+        ESP_LOGI(motor_motion, "move right!");
+        break;
+    case 'b':
+        ESP_LOGI(motor_motion, "move back!");
+        break;
+    case 's':
+        ESP_LOGI(motor_motion, "move stop!");
+        break;
+    default:
+        break;
+    }
 }

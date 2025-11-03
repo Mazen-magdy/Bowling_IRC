@@ -21,9 +21,9 @@
 void socket_client_setup_1();
 
 
-// float response_from_vision = 0; // global variable
-#define port 5555
-#define ip_address "192.168.175.16"
+// Define the destination ip & port
+#define port 50123
+#define ip_address "192.168.43.187"
 
 // Your network credentials
 #define WIFI_SSID      "bowling"

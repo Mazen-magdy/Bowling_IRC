@@ -10,15 +10,17 @@
 #define LEDC_TIMER      LEDC_TIMER_0   // choosing timer 0->3
 #define LEDC_CHANNEL    LEDC_CHANNEL_0  // choosing channel 0->7
 
-void strike_init(struct StrikeSettings* settings, int servo_pin, int motor1_pin, int motor2_pin);
-
-void strike_execute(struct StrikeSettings* settings);
-
 struct StrikeSettings
 {
     int servo_pin;
     int motor1_pin;
     int motor2_pin;
 };
+
+void strike_init(struct StrikeSettings* settings, int servo_pin, int motor1_pin, int motor2_pin);
+
+void strike_execute(struct StrikeSettings* settings);
+
+
 
 #endif // STRIKE_H

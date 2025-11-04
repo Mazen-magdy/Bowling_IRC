@@ -47,7 +47,7 @@ void app_main(void)
     pid_init(&pid, 1.0f, 0.0f, 0.0f, 0.01f, -12.0f, 12.0f);
     // motor 2
     printf("Encoder pin: %d\n", E2.pin_A);
-    encoder_init(&E2, 36, 39, 360.0f, 31.4f);
+    encoder_init(&E2, 32, 33, 360.0f, 31.4f);
     E2.target_distance = -300.0f;
     encoder_attach_isr(&E2);
     gpio_isr_handler_add(E2.pin_A, encoder_isr_2, NULL);
@@ -72,18 +72,17 @@ void app_main(void)
     }
 
     // motor initialization
-    struct Motor motor1;
-    motor_init(&motor1, 18, 19, 21, 0.0f, 255.0f, 0); // PWM pin, IN1, IN2, min PWM, max PWM, channel
+    struct Motor motor1; // 19 18 5
+    motor_init(&motor1, 17, 16, 4, 0.0f, 255.0f, 0); // PWM pin, IN1, IN2, min PWM, max PWM, channel
     printf("Hello, World! \n");
-    struct Motor motor2;
-    motor_init(&motor2, 2, 17, 16, 0.0f, 255.0f, 0); // PWM pin, IN1, IN2, min PWM, max PWM, channel
+    struct Motor motor2; // 17 16 4
+    motor_init(&motor2, 19, 5, 18, 0.0f, 255.0f, 0); // PWM pin, IN1, IN2, min PWM, max PWM, channel
     printf("Hello, World! \n");
 
     // mpu init
     struct mpu6050_Data mpu_data;
-    mpu_data.roll_target = 0.0f;
-    mpu_data.pitch_target = 0.0f;
-    MPU6050();
+    mpu_data.angle_target = 0.0f;
+    // MPU6050();
 
     // Strike mechanism init
     struct StrikeSettings strike_settings;
@@ -94,33 +93,34 @@ void app_main(void)
         // * * code are divided into blocks each block tests a unit from the code 
 
         // TODO: this part is for testing PID control with encoder feedback then send signal to motor
-        {     
-            if(timer_flag){
-                timer_flag = 0;
-                float error = encoder_get_error_distance(&E1);
-                float error2 = encoder_get_error_distance(&E2);
-                pid_compute(&pid, error, 0.015f);
-                pid_compute(&pid2, error2, 0.015f);
-                printf("PID1 output: %.2f ", pid.output);
-                printf("PID2 output: %.2f \n", pid2.output);
-                motor1.current_speed = motor_speed_ratio(&motor1, pid.output);
-                motor2.current_speed = motor_speed_ratio(&motor2, pid2.output);
-                motor_set_ratio(&motor1, motor1.current_speed);
-                motor_set_ratio(&motor2, motor2.current_speed);
-            }
-            printf("Counts1: %ld ", E1.counts);
-            printf("Counts2: %ld \n", E2.counts);
-            // ? can we use 2 PIDs one for linear motion and the other for maintain zero angle shift and it satisfy both conditions
-        }
+        // * running but needs high calibration
+        // {     
+        //     if(timer_flag){
+        //         timer_flag = 0;
+        //         float error = encoder_get_error_distance(&E1);
+        //         float error2 = encoder_get_error_distance(&E2);
+        //         pid_compute(&pid, error, 0.015f);
+        //         pid_compute(&pid2, error2, 0.015f);
+        //         printf("%.2f ", pid.output);
+        //         printf("%.2f ", pid2.output);
+        //         motor1.current_speed = motor_speed_ratio(&motor1, pid.output);
+        //         motor2.current_speed = motor_speed_ratio(&motor2, pid2.output);
+        //         motor_set_ratio(&motor1, motor1.current_speed);
+        //         motor_set_ratio(&motor2, motor2.current_speed);
+        //     }
+        //     printf("%ld ", E1.counts);
+        //     printf("%ld \n", E2.counts);
+        //     // ? can we use 2 PIDs one for linear motion and the other for maintain zero angle shift and it satisfy both conditions
+        // }
         // TODO: this part is for testing MPU6050 with PID control to balance the robot and rotate around the center
-        // ! notice that you may change roll angle with roll 
         {
             if(timer_flag){
                 timer_flag = 0;
                 update_angles(&mpu_data);
-                float error = mpu_data.roll_error;
+                float error = mpu_data.angle_error;
+                printf("%.2f ", mpu_data.angle);
                 pid_compute(&rotate, error, 0.015f);
-                printf("PID output: %.2f ", rotate.output);
+                printf("%.2f ", rotate.output);
                 motor1.current_speed = motor_speed_ratio(&motor1, rotate.output);
                 motor2.current_speed = motor_speed_ratio(&motor2, -1 * rotate.output);
                 motor_set_ratio(&motor1, motor1.current_speed);
@@ -132,6 +132,7 @@ void app_main(void)
             strike_execute(&strike_settings);
             vTaskDelay(5000 / portTICK_PERIOD_MS); // wait for 5 seconds before next strike
         }
+
     }
     
 }

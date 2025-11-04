@@ -18,7 +18,10 @@
 
 
 /*-----Functions declarations-----*/
-void socket_client_setup_1();
+void socket_create_and_connect();
+void send_or_receive(char *message);
+void close_socket();
+void wifi_start();
 
 
 // Define the destination ip & port
@@ -38,8 +41,7 @@ void socket_client_setup_1();
 static void event_handler(void* arg, esp_event_base_t event_base,
                           int32_t event_id, void* event_data);
 
-void socket_client_setup_1();
-
-void wifi_start();
+int sock;
+char received_buffer[128]; // the recieved message will be stored here
 
 #endif // MAIN_H

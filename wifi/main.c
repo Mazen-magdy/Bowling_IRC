@@ -114,14 +114,18 @@ void wifi_start()
 void app_main(void)
 {
     wifi_start();
+    socket_create_and_connect();
+    char s[] = "hello";
+    while (true)
+    {
+        send_or_receive(s);
+    }
 }
 
-void socket_client_setup_1()
-{
-    char *message = "Hello from esp!";
-    char rx_buffer[128]; // the recieved message will be stored here
-    struct sockaddr_in dest_addr; 
 
+void socket_create_and_connect()
+{
+    struct sockaddr_in dest_addr; 
 
     //configure server destination address
     dest_addr.sin_family = AF_INET;     // make it IPv4
@@ -129,7 +133,7 @@ void socket_client_setup_1()
     dest_addr.sin_addr.s_addr = inet_addr(ip_address);   // defining the ip-address of the server
     
     // creating socket
-    int sock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP); // IPv4 , TCP , protocol
+    sock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP); // IPv4 , TCP , protocol
     if (sock < 0)
     {
         ESP_LOGE(TAG, "Failed to create socket !");
@@ -151,9 +155,10 @@ void socket_client_setup_1()
         return;
     }
     ESP_LOGI(SOCKET_TAG, "client connected (we connected to the server)! ");
+}
 
-    
-    
+void send_or_receive(char *message)
+{
     // send a message with handling the feedback from it
     int feedack_from_send = send(sock, message, strlen(message), 0);
     if (feedack_from_send < 0)
@@ -169,10 +174,8 @@ void socket_client_setup_1()
         ESP_LOGI(SOCKET_TAG, "message sent!");
     }
         
-        
-        
     // recieve response with handling the feedback from it
-    int feedback_from_recieve = recv(sock, rx_buffer, sizeof(rx_buffer)-1, 0);
+    int feedback_from_recieve = recv(sock, received_buffer, sizeof(received_buffer)-1, 0);
     if (feedback_from_recieve < 0)
         {
             ESP_LOGE(SOCKET_TAG, "Error recieving the message : error no %d", feedback_from_recieve);
@@ -183,13 +186,12 @@ void socket_client_setup_1()
         }
     else
         {
-            ESP_LOGI(SOCKET_TAG, "Message received: %s", rx_buffer);
+            ESP_LOGI(SOCKET_TAG, "Message received: %s", received_buffer);
         }
-        
-    // Delay between the messages
-    vTaskDelay(50 / portTICK_PERIOD_MS);
-    
+}
 
+void close_socket()
+{
     // Close the socket 
     close(sock);
     ESP_LOGI(SOCKET_TAG, "Socket closed!");

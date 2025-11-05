@@ -15,6 +15,7 @@ struct setup
     int direction; // 0 for in front of me, 1 for at left , 2 for behind me, 3 for at right
 };
 
+struct setup s1;
 
 struct Encoder E1;
 void encoder_isr_1(void* arg)
@@ -73,10 +74,10 @@ void app_main(void)
 
     // motor initialization
     struct Motor motor1; // 19 18 5
-    motor_init(&motor1, 17, 16, 4, 0.0f, 255.0f, 0); // PWM pin, IN1, IN2, min PWM, max PWM, channel
+    motor_init(&motor1, 4, 16, 17, 0.0f, 255.0f, 0); // PWM pin, IN1, IN2, min PWM, max PWM, channel
     printf("Hello, World! \n");
     struct Motor motor2; // 17 16 4
-    motor_init(&motor2, 19, 5, 18, 0.0f, 255.0f, 0); // PWM pin, IN1, IN2, min PWM, max PWM, channel
+    motor_init(&motor2, 19, 18, 5, 0.0f, 255.0f, 0); // PWM pin, IN1, IN2, min PWM, max PWM, channel
     printf("Hello, World! \n");
 
     // mpu init
@@ -86,7 +87,7 @@ void app_main(void)
 
     // Strike mechanism init
     struct StrikeSettings strike_settings;
-    strike_init(&strike_settings, 4, 22, 23); // servo pin, motor1 pin, motor2 pin
+    strike_init(&strike_settings, 10, 22, 23); // servo pin, motor1 pin, motor2 pin
     while (1)
     {
         /* code */
@@ -128,9 +129,20 @@ void app_main(void)
             }
         }
         // TODO: this part is for testing strike mechanism
+        // {
+        //     strike_execute(&strike_settings);
+        //     vTaskDelay(5000 / portTICK_PERIOD_MS); // wait for 5 seconds before next strike
+        // }
+        // TODO: initialization
         {
-            strike_execute(&strike_settings);
-            vTaskDelay(5000 / portTICK_PERIOD_MS); // wait for 5 seconds before next strike
+            // send initialize message 
+            // initialize params 
+        }
+        // TODO: get angle from camera
+        {
+            // send message to get angle 
+            // retrieve angle
+            // set it as an target 
         }
 
     }

@@ -89,7 +89,7 @@ void i2c_master_init() {
 
 // optional scan for I2C address
 void i2c_scan() {
-    printf("Scanning I2C bus...\n");
+    // printf("Scanning I2C bus...\n");
     for (uint8_t addr = 1; addr < 127; addr++) {
         i2c_cmd_handle_t cmd = i2c_cmd_link_create();
         i2c_master_start(cmd);
@@ -99,7 +99,7 @@ void i2c_scan() {
         i2c_cmd_link_delete(cmd);
 
         if (ret == ESP_OK) {
-            printf("Found device at 0x%02X\n", addr);
+            // printf("Found device at 0x%02X\n", addr);
         }
     }
 }

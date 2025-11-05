@@ -59,7 +59,7 @@ void motor_init(struct Motor* motor, int pin_PWM, int pin_IN1, int pin_IN2, floa
 void motor_set_ratio(struct Motor* motor, float ratio) {
     // Clamp ratio between -1.0 and 1.0 using math.h functions
     ratio = fmaxf(fminf(ratio, 1.0f), -1.0f);
-    printf("ratio : %f",ratio);
+    // printf("ratio : %f",ratio);
     uint32_t duty = 0;
     
     if (ratio > 0.0f) {
@@ -71,7 +71,7 @@ void motor_set_ratio(struct Motor* motor, float ratio) {
         // Set initial state (motor stopped)
         gpio_set_level(motor->pin_IN1, 1);
         gpio_set_level(motor->pin_IN2, 0);
-        printf("set in1 in2 : %d %d", 1,0) ;
+        // printf("set in1 in2 : %d %d", 1,0) ;
         // Apply minimum PWM if needed using math.h
         float min_ratio = motor->min_PWM / 255.0f;
         ratio = fmaxf(ratio, min_ratio);
@@ -86,7 +86,7 @@ void motor_set_ratio(struct Motor* motor, float ratio) {
         // Set initial state (motor stopped)
         gpio_set_level(motor->pin_IN1, 0);
         gpio_set_level(motor->pin_IN2, 1);
-        printf("set in1 in2 : %d %d", 0,1) ;
+        // printf("set in1 in2 : %d %d", 0,1) ;
         // Apply minimum PWM if needed using math.h
         float min_ratio = motor->min_PWM / 255.0f;
         float abs_ratio = fabsf(ratio);  // Use fabsf from math.h

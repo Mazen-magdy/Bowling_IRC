@@ -198,6 +198,19 @@ void close_socket()
 }
 
 
+
+// *wifi connect`
+// * open socket
+// * send / receive message 
+// * close socket
+
+
+
+
+
+
+
+
 void take_desicion(char c)
 {
     switch (c)

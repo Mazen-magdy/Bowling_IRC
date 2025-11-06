@@ -121,8 +121,8 @@ double get_angle()
 
         get_accel_data(&ax, &ay, &az);
         calculate_angles(ax, ay, az, &pitch, &roll);
-
-        return pitch;
+        printf("Pitch: %.2f, Roll: %.2f\n", pitch, roll);
+        return roll;
 }
 void update_angles(struct mpu6050_Data* mpu_data) {
     mpu_data->angle = get_angle();

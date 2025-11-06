@@ -1,6 +1,8 @@
 #include <stdio.h>
 #include <driver/gpio.h>
 #include <stdint.h>
+#include <math.h>
+#include <stdlib.h> // for atof/strtof
 #include "freertos/FreeRTOS.h"
 #include "esp_timer.h"
 #include "../../Software_components/Encoder.h"
@@ -8,6 +10,7 @@
 #include "../../Software_components/Motor.h"
 #include "../../Software_components/mpu.h"
 #include "../../Software_components/Strike.h"
+#include "../../Software_components/Wifi.h"
 
 struct setup
 {
@@ -16,7 +19,7 @@ struct setup
 };
 
 struct setup s1;
-
+int create_socket_flag = 0;
 struct Encoder E1;
 void encoder_isr_1(void* arg)
 {
@@ -34,9 +37,42 @@ void pid_timer(void* arg)
 }
 void app_main(void)
 {
+    float p1 = 0.0f, i1 = 0.0f, d1 = 0.0f;
+    float p2 = 0.0f, i2 = 0.0f, d2 = 0.0f;
+    // wifi initialization
+    wifi_start();
+    // get PID params from server
+    {
+            if(create_socket_flag == 0)
+            {
+                socket_create_and_connect();
+                create_socket_flag = 1;
+            }
+            for(int i = 0; i < 6; i++){
+                char message[2]; // const 
+                message[0] = 's';
+                message[1] = '\0';
+                send_or_receive(message);
+                if(i == 0)
+                    p1 = strtof(received_buffer, NULL);
+                else if(i == 1)
+                    i1 = strtof(received_buffer, NULL);
+                else if(i == 2)
+                    d1 = strtof(received_buffer, NULL);
+                else if(i == 3)
+                    p2 = strtof(received_buffer, NULL);
+                else if(i == 4)
+                    i2 = strtof(received_buffer, NULL);
+                else if(i == 5)
+                    d2 = strtof(received_buffer, NULL);
+                printf("%s\n", received_buffer);
+            }
+            printf("finish");
+            // close_socket();
+        }
     // rotate PID controller
     struct PID rotate;
-    pid_init(&rotate, 1.0f, 0.0f, 0.0f, 0.01f, -12.0f, 12.0f);
+    pid_init(&rotate, p1, i1, d1, 0.01f, -12.0f, 12.0f);
     // motor 1 
     printf("Encoder pin: %d\n", E1.pin_A);
     encoder_init(&E1, 34, 35, 360.0f, 31.4f);
@@ -45,7 +81,7 @@ void app_main(void)
     gpio_isr_handler_add(E1.pin_A, encoder_isr_1, NULL);
 
     struct PID pid;
-    pid_init(&pid, 1.0f, 0.0f, 0.0f, 0.01f, -12.0f, 12.0f);
+    pid_init(&pid, p1, i1, d1, 0.01f, -12.0f, 12.0f);
     // motor 2
     printf("Encoder pin: %d\n", E2.pin_A);
     encoder_init(&E2, 32, 33, 360.0f, 31.4f);
@@ -54,7 +90,7 @@ void app_main(void)
     gpio_isr_handler_add(E2.pin_A, encoder_isr_2, NULL);
 
     struct PID pid2;
-    pid_init(&pid2, 1.0f, 0.0f, 0.0f, 0.01f, -12.0f, 12.0f);
+    pid_init(&pid2, p2, i2, d2, 0.01f, -12.0f, 12.0f);
     // setup timer interrupt
     
 
@@ -88,46 +124,65 @@ void app_main(void)
     // Strike mechanism init
     struct StrikeSettings strike_settings;
     strike_init(&strike_settings, 10, 22, 23); // servo pin, motor1 pin, motor2 pin
+    
+    
     while (1)
     {
         /* code */
         // * * code are divided into blocks each block tests a unit from the code 
-
+        // TODO: Setup
+        {
+            // if(create_socket_flag == 0)
+            // {
+            //     socket_create_and_connect();
+            //     create_socket_flag = 1;
+            // }
+            char message[3]; // const 
+            message[0] = 'setup';
+            message[1] = '\0';
+            send_or_receive(message); // recieves two values: region and direction 01 10 02 03 04 ...
+            s1.region = atoi(&received_buffer[0]);
+            s1.direction = atoi(&received_buffer[1]);
+            printf("%s\n", received_buffer);
+            printf("finish");
+            // close_socket();
+        }
         // TODO: this part is for testing PID control with encoder feedback then send signal to motor
         // * running but needs high calibration
-        // {     
-        //     if(timer_flag){
-        //         timer_flag = 0;
-        //         float error = encoder_get_error_distance(&E1);
-        //         float error2 = encoder_get_error_distance(&E2);
-        //         pid_compute(&pid, error, 0.015f);
-        //         pid_compute(&pid2, error2, 0.015f);
-        //         printf("%.2f ", pid.output);
-        //         printf("%.2f ", pid2.output);
-        //         motor1.current_speed = motor_speed_ratio(&motor1, pid.output);
-        //         motor2.current_speed = motor_speed_ratio(&motor2, pid2.output);
-        //         motor_set_ratio(&motor1, motor1.current_speed);
-        //         motor_set_ratio(&motor2, motor2.current_speed);
-        //     }
-        //     printf("%ld ", E1.counts);
-        //     printf("%ld \n", E2.counts);
-        //     // ? can we use 2 PIDs one for linear motion and the other for maintain zero angle shift and it satisfy both conditions
-        // }
-        // TODO: this part is for testing MPU6050 with PID control to balance the robot and rotate around the center
-        {
+        {     
             if(timer_flag){
                 timer_flag = 0;
-                update_angles(&mpu_data);
-                float error = mpu_data.angle_error;
-                printf("%.2f ", mpu_data.angle);
-                pid_compute(&rotate, error, 0.015f);
-                printf("%.2f ", rotate.output);
-                motor1.current_speed = motor_speed_ratio(&motor1, rotate.output);
-                motor2.current_speed = motor_speed_ratio(&motor2, -1 * rotate.output);
+                float error = encoder_get_error_distance(&E1);
+                float error2 = encoder_get_error_distance(&E2);
+                pid_compute(&pid, error, 0.015f);
+                pid_compute(&pid2, error2, 0.015f);
+                printf("%.2f ", pid.output);
+                printf("%.2f ", pid2.output);
+                motor1.current_speed = motor_speed_ratio(&motor1, pid.output);
+                motor2.current_speed = motor_speed_ratio(&motor2, pid2.output);
                 motor_set_ratio(&motor1, motor1.current_speed);
                 motor_set_ratio(&motor2, motor2.current_speed);
             }
+            printf("%ld ", E1.counts);
+            printf("%ld \n", E2.counts);
+            // ? can we use 2 PIDs one for linear motion and the other for maintain zero angle shift and it satisfy both conditions
+        
         }
+        // TODO: this part is for testing MPU6050 with PID control to balance the robot and rotate around the center
+        // {
+        //     if(timer_flag){
+        //         timer_flag = 0;
+        //         update_angles(&mpu_data);
+        //         float error = mpu_data.angle_error;
+        //         printf("%.2f ", mpu_data.angle);
+        //         pid_compute(&rotate, error, 0.015f);
+        //         printf("%.2f ", rotate.output);
+        //         motor1.current_speed = motor_speed_ratio(&motor1, rotate.output);
+        //         motor2.current_speed = motor_speed_ratio(&motor2, -1 * rotate.output);
+        //         motor_set_ratio(&motor1, motor1.current_speed);
+        //         motor_set_ratio(&motor2, motor2.current_speed);
+        //     }
+        // }
         // TODO: this part is for testing strike mechanism
         // {
         //     strike_execute(&strike_settings);
@@ -144,7 +199,10 @@ void app_main(void)
             // retrieve angle
             // set it as an target 
         }
-
+        // TODO: rotation by motion
+        {
+            // same as motion but one motor forward the other backward
+        }
     }
     
 }

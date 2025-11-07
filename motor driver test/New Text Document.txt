@@ -1,0 +1,108 @@
+#include <stdio.h>
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+#include "driver/gpio.h"
+#include "driver/ledc.h"
+#include "esp_err.h"
+
+// Motor 1 pins
+#define M1_ENA     18
+#define M1_IN1     25
+#define M1_IN2     26
+
+// Motor 2 pins
+#define M2_ENB     19
+#define M2_IN3     27
+#define M2_IN4     14
+
+// PWM configuration
+#define LEDC_MODE           LEDC_HIGH_SPEED_MODE
+#define LEDC_TIMER          LEDC_TIMER_0
+#define LEDC_DUTY_RES       LEDC_TIMER_8_BIT // 8-bit resolution (0–255)
+#define LEDC_FREQUENCY      1000             // 1 kHz PWM frequency
+
+void motor_init(void) {
+    // Configure direction pins
+    gpio_config_t io_conf = {
+        .mode = GPIO_MODE_OUTPUT,
+        .pin_bit_mask = (1ULL << M1_IN1) | (1ULL << M1_IN2) | (1ULL << M2_IN3) | (1ULL << M2_IN4)
+    };
+    gpio_config(&io_conf);
+
+    // Configure PWM for ENA (Motor 1)
+    ledc_timer_config_t ledc_timer = {
+        .speed_mode       = LEDC_MODE,
+        .timer_num        = LEDC_TIMER,
+        .duty_resolution  = LEDC_DUTY_RES,
+        .freq_hz          = LEDC_FREQUENCY,
+        .clk_cfg          = LEDC_AUTO_CLK
+    };
+    ledc_timer_config(&ledc_timer);
+
+    ledc_channel_config_t ledc_channel[2] = {
+        {
+            .channel    = LEDC_CHANNEL_0,
+            .duty       = 0,
+            .gpio_num   = M1_ENA,
+            .speed_mode = LEDC_MODE,
+            .hpoint     = 0,
+            .timer_sel  = LEDC_TIMER
+        },
+        {
+            .channel    = LEDC_CHANNEL_1,
+            .duty       = 0,
+            .gpio_num   = M2_ENB,
+            .speed_mode = LEDC_MODE,
+            .hpoint     = 0,
+            .timer_sel  = LEDC_TIMER
+        }
+    };
+
+    ledc_channel_config(&ledc_channel[0]);
+    ledc_channel_config(&ledc_channel[1]);
+}
+
+void motor_set_direction(int motor, bool forward) {
+    if (motor == 1) {
+        gpio_set_level(M1_IN1, forward);
+        gpio_set_level(M1_IN2, !forward);
+    } else if (motor == 2) {
+        gpio_set_level(M2_IN3, forward);
+        gpio_set_level(M2_IN4, !forward);
+    }
+}
+
+void motor_set_speed(int motor, uint8_t speed) {
+    uint32_t duty = speed; // 0–255 for 8-bit resolution
+    if (motor == 1)
+        ledc_set_duty(LEDC_MODE, LEDC_CHANNEL_0, duty);
+    else if (motor == 2)
+        ledc_set_duty(LEDC_MODE, LEDC_CHANNEL_1, duty);
+
+    ledc_update_duty(LEDC_MODE, (motor == 1) ? LEDC_CHANNEL_0 : LEDC_CHANNEL_1);
+}
+
+void app_main(void) {
+    motor_init();
+
+    while (1) {
+        printf("Forward both motors\n");
+        motor_set_direction(1, true);
+        motor_set_direction(2, true);
+        motor_set_speed(1, 200);
+        motor_set_speed(2, 200);
+        vTaskDelay(pdMS_TO_TICKS(3000));
+
+        printf("Reverse both motors\n");
+        motor_set_direction(1, false);
+        motor_set_direction(2, false);
+        motor_set_speed(1, 200);
+        motor_set_speed(2, 200);
+        vTaskDelay(pdMS_TO_TICKS(3000));
+
+        printf("Stop motors\n");
+        motor_set_speed(1, 0);
+        motor_set_speed(2, 0);
+        vTaskDelay(pdMS_TO_TICKS(2000));
+    }
+}
